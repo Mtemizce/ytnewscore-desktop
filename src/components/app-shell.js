@@ -2,7 +2,7 @@
 // arka planda sistem bildirimleri (Reverb + yoklama) ve tepsi ipucu. Panelin ekranları panelden gelir.
 import { api } from '../api/index.js';
 import { deviceName } from '../core/device.js';
-import { closePanel, onShellEvent, openPanel, setLocked, setShellVisible, systemIdleSeconds } from '../core/desktop.js';
+import { closePanel, onShellEvent, openPanel, setLocked, setShellVisible, systemIdleSeconds, toggleWindowFullscreen } from '../core/desktop.js';
 import { errorMessage, formatDate, initials } from '../core/format.js';
 import { whenUnauthorized } from '../core/http.js';
 import { systemNotify } from '../core/notify.js';
@@ -33,6 +33,8 @@ export function appShell() {
 
     pollTimer: null,
     idleTimer: null,
+    panelOpen: false,
+    signingOut: false,
 
     initials,
     formatDate,
@@ -41,18 +43,24 @@ export function appShell() {
       whenUnauthorized(() => this.markSignedOut(this.activeId, 'Bu hesabın bağlantısı kesildi; yeniden giriş yapın.'));
       onShellEvent('panel://logout', () => this.signOutActive());
       onShellEvent('panel://session-expired', () => this.reconnectPanel());
-      onShellEvent('app://accounts', () => this.showAccounts());
+      onShellEvent('app://accounts', () => this.switchAccount());
       onShellEvent('app://lock', () => this.lock());
+      window.addEventListener('keydown', (event) => {
+        if (event.key === 'F11') {
+          event.preventDefault();
+          toggleWindowFullscreen();
+        }
+      });
 
       clearInterval(this.idleTimer);
       this.idleTimer = setInterval(() => this.checkIdle(), 30_000);
 
+      // Uygulama açılırken hatırlanan hesap kendiliğinden açılmaz: kilit ekranı o hesabın şifresini
+      // ister (aynı bilgisayarı kullanan biri başkasının paneline giremesin).
       const active = accounts.active();
-      if (this.locked && active?.token) {
-        setLocked(true);
+      if (active?.token) {
+        this.setLockedState(true);
         this.startBackground();
-      } else if (active?.token) {
-        this.open(active);
       }
       if (!this.list.length) {
         this.view = 'add';
@@ -99,6 +107,7 @@ export function appShell() {
         accounts.update(account.id, { user: me.data, siteName: info?.name || account.siteName, lastOpenedAt: new Date().toISOString() });
         this.refreshList();
         await openPanel(link.url, `${this.active.siteName || 'Panel'} — YTNewsCore`);
+        this.panelOpen = true;
         setShellVisible(false);
         this.startBackground();
       } catch (error) {
@@ -110,7 +119,7 @@ export function appShell() {
 
     /** Panel oturumu düştüğünde (ör. uzun süre açık kaldı) token ile yeniden bağlanır. */
     async reconnectPanel() {
-      if (!this.active?.token) {
+      if (!this.active?.token || this.signingOut) {
         return;
       }
       try {
@@ -138,12 +147,29 @@ export function appShell() {
       this.showAccounts();
     },
 
-    /** Panelden "Çıkış": bu hesabın token'ı iptal edilir, hesap listede "oturum kapalı" kalır. */
+    /**
+     * "Hesap Değiştir" (çekmece, tepsi) ve panelden "Oturumu kapat": bu hesabın token'ı iptal
+     * edilir, panel kapanır; hesap listede "oturum kapalı" kalır, yeniden girmek şifre ister.
+     */
     async signOutActive() {
-      const id = this.activeId;
-      await api.auth.logout().catch(() => {});
-      await this.stopActive();
-      this.markSignedOut(id);
+      if (this.signingOut) {
+        return;
+      }
+      this.signingOut = true;
+      try {
+        const id = this.activeId;
+        if (this.active?.token) {
+          await api.auth.logout().catch(() => {});
+        }
+        await this.stopActive();
+        this.markSignedOut(id);
+      } finally {
+        this.signingOut = false;
+      }
+    },
+
+    switchAccount() {
+      return this.active?.token ? this.signOutActive() : this.showAccounts();
     },
 
     markSignedOut(id, message = '') {
@@ -165,6 +191,7 @@ export function appShell() {
       disconnectRealtime();
       this.$store.stats.stop();
       this.setLockedState(false);
+      this.panelOpen = false;
       await closePanel();
     },
 
@@ -254,6 +281,9 @@ export function appShell() {
       try {
         await api.me.verifyPassword(this.unlockPassword);
         this.setLockedState(false);
+        if (!this.panelOpen && this.active) {
+          await this.open(this.active);
+        }
       } catch (error) {
         this.unlockError = Object.values(error.errors || {}).flat()[0] || errorMessage(error);
         this.unlockPassword = '';

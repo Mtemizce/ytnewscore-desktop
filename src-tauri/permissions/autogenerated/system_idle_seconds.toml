@@ -1,0 +1,11 @@
+# Automatically generated - DO NOT EDIT!
+
+[[permission]]
+identifier = "allow-system-idle-seconds"
+description = "Enables the system_idle_seconds command without any pre-configured scope."
+commands.allow = ["system_idle_seconds"]
+
+[[permission]]
+identifier = "deny-system-idle-seconds"
+description = "Denies the system_idle_seconds command without any pre-configured scope."
+commands.deny = ["system_idle_seconds"]

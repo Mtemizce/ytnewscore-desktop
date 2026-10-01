@@ -24,6 +24,7 @@ export const setLocked = (locked) => call('set_locked', { locked });
 export const setShellVisible = (visible) => call('set_shell_visible', { visible });
 export const systemIdleSeconds = () => call('system_idle_seconds').then((s) => Number(s) || 0);
 export const toggleWidget = () => call('toggle_widget');
+export const toggleWindowFullscreen = () => call('toggle_window_fullscreen');
 export const showMainWindow = () => call('show_main');
 export const quitApp = () => call('quit_app');
 export const setTrayTooltip = (text) => call('set_tray_tooltip', { text }).catch(() => {});

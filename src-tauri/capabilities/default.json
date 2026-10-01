@@ -9,6 +9,16 @@
   "permissions": [
     "core:default",
     "core:window:allow-start-dragging",
+    "allow-show-main",
+    "allow-open-panel",
+    "allow-close-panel",
+    "allow-set-locked",
+    "allow-set-shell-visible",
+    "allow-system-idle-seconds",
+    "allow-toggle-widget",
+    "allow-toggle-window-fullscreen",
+    "allow-set-tray-tooltip",
+    "allow-quit-app",
     "notification:default",
     "os:default",
     {

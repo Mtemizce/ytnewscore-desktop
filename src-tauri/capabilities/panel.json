@@ -1,0 +1,17 @@
+{
+  "$schema": "../gen/schemas/desktop-schema.json",
+  "identifier": "panel",
+  "description": "Sitenin paneli (uzak sayfa): yalnız uygulamanın çekmece menüsü / F11 komutu. Panel penceresi hesabın sitesi dışına gidemez (on_navigation).",
+  "windows": [
+    "panel"
+  ],
+  "remote": {
+    "urls": [
+      "http://*",
+      "https://*"
+    ]
+  },
+  "permissions": [
+    "allow-panel-action"
+  ]
+}

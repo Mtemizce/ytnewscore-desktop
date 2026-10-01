@@ -7,6 +7,7 @@
     <p class="lock-error" x-show="unlockError" x-text="unlockError"></p>
     <button class="btn btn-primary btn-block" :disabled="unlocking" x-text="unlocking ? 'Açılıyor…' : 'Kilidi Aç'"></button>
     <button type="button" class="link lock-link" @click="signOutActive()">Bu hesaptan çık</button>
+    <p class="lock-hint">F11 · tam ekran</p>
   </form>
   <div class="lock-stats">
     <div class="lock-stat"><b x-text="$store.stats.value('live_visitors')"></b><span>anlık ziyaretçi</span></div>

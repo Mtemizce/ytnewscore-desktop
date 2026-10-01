@@ -1,11 +1,14 @@
 // Masaüstü kabuğu: panel penceresi (sitenin paneli), kabuk penceresi (hesap seçici + kilit),
 // masaüstü widget'ı, sistem tepsisi ve bildirim eklentileri.
+mod downloads;
+
 use std::sync::Mutex;
 
 use tauri::{
     menu::{Menu, MenuItem, PredefinedMenuItem},
     tray::{MouseButton, MouseButtonState, TrayIconBuilder, TrayIconEvent},
-    AppHandle, Emitter, Manager, State, Url, WebviewUrl, WebviewWindowBuilder, WindowEvent,
+    webview::NewWindowResponse,
+    AppHandle, Emitter, Manager, State, Url, WebviewUrl, WebviewWindow, WebviewWindowBuilder, WindowEvent,
 };
 use tauri_plugin_opener::OpenerExt;
 
@@ -14,22 +17,30 @@ const SHELL_LABEL: &str = "main";
 const PANEL_LABEL: &str = "panel";
 const WIDGET_LABEL: &str = "widget";
 
-/// Uzak panel sayfasına IPC verilmez; F11 bu adrese gitmeye çalışır, `on_navigation` yakalayıp
-/// iptal eder ve tam ekranı açar/kapatır.
-const FULLSCREEN_PATH: &str = "/__ytn-desktop/fullscreen";
-const PANEL_SCRIPT: &str = r#"
-document.addEventListener('keydown', function (event) {
-  if (event.key === 'F11') {
-    event.preventDefault();
-    window.location.assign('/__ytn-desktop/fullscreen');
-  }
-}, true);
-"#;
+/// Panelin her sayfasına eklenen çekmece menü + F11 (yalnız `panel_action` çağırabilir).
+const PANEL_SCRIPT: &str = include_str!("panel-drawer.js");
 
 /// Kilitliyken panel gösterilmez; tepsi "Aç" kabuğu (kilit ekranı) gösterir.
 #[derive(Default)]
 struct AppState {
     locked: Mutex<bool>,
+    /// Panelden "Oturumu kapat"tan sonra gelen /admin/login yönlendirmesi "oturum düştü" sayılmaz
+    /// (yoksa kabuk token ile yeniden giriş yapardı).
+    logging_out: Mutex<bool>,
+}
+
+fn set_logging_out(app: &AppHandle, value: bool) {
+    *app.state::<AppState>().logging_out.lock().unwrap() = value;
+}
+
+fn is_panel_path(path: &str) -> bool {
+    path == "/admin" || path.starts_with("/admin/")
+}
+
+fn open_in_browser(app: &AppHandle, url: &Url) {
+    if matches!(url.scheme(), "http" | "https") {
+        let _ = app.opener().open_url(url.as_str(), None::<&str>);
+    }
 }
 
 fn show_window(app: &AppHandle, label: &str) {
@@ -56,12 +67,14 @@ fn show_main(app: AppHandle) {
 }
 
 /// Panel penceresini açar ya da var olanı verilen adrese götürür (tek kullanımlık giriş bağlantısı).
-/// Panelden çıkış hesap seçiciye döndürür, düşen oturum kabukta yeniden bağlanır, başka sitelere
-/// giden bağlantılar varsayılan tarayıcıda açılır. Uzak sayfaya Tauri IPC verilmez.
+/// Panelden çıkış hesap seçiciye döndürür, düşen oturum kabukta yeniden bağlanır. Panel dışındaki
+/// adresler ("Sitede gör", "Siteye Git", başka siteler) ve yeni sekmeler varsayılan tarayıcıda
+/// açılır. Uzak sayfa yalnız `panel_action`'ı çağırabilir.
 /// `async`: Windows'ta senkron komut içinden pencere oluşturmak kilitlenir.
 #[tauri::command]
 async fn open_panel(app: AppHandle, url: String, title: String) -> Result<(), String> {
     let target: Url = url.parse().map_err(|e: url::ParseError| e.to_string())?;
+    set_logging_out(&app, false);
 
     if let Some(window) = app.get_webview_window(PANEL_LABEL) {
         window.navigate(target).map_err(|e| e.to_string())?;
@@ -72,6 +85,7 @@ async fn open_panel(app: AppHandle, url: String, title: String) -> Result<(), St
 
     let host = target.host_str().unwrap_or_default().to_string();
     let handle = app.clone();
+    let browser = app.clone();
     let window = WebviewWindowBuilder::new(&app, PANEL_LABEL, WebviewUrl::External(target))
         .title(&title)
         .inner_size(1360.0, 860.0)
@@ -79,29 +93,37 @@ async fn open_panel(app: AppHandle, url: String, title: String) -> Result<(), St
         .center()
         .initialization_script(PANEL_SCRIPT)
         .on_navigation(move |next| {
-            if next.path() == FULLSCREEN_PATH {
-                let app = handle.clone();
-                tauri::async_runtime::spawn(async move { toggle_panel_fullscreen(&app) });
-                return false;
+            // blob:, data:, about: (indirmeler, gömülü içerik) olduğu gibi.
+            if !matches!(next.scheme(), "http" | "https") {
+                return true;
             }
-            if next.host_str().unwrap_or_default() != host {
-                let _ = handle.opener().open_url(next.as_str(), None::<&str>);
+            if next.host_str().unwrap_or_default() != host || !is_panel_path(next.path()) {
+                open_in_browser(&handle, next);
                 return false;
             }
             match next.path() {
-                // Panelden çıkış: uygulama da bu hesabın panelini kapatır, hesap seçiciye döner.
+                // Panelden çıkış: sunucu web oturumunu kapatır; kabuk token'ı iptal edip hesap seçiciye döner.
                 "/admin/logout" => {
+                    set_logging_out(&handle, true);
                     let _ = handle.emit("panel://logout", ());
                     true
                 }
-                // Panel oturumu düştü: kabuk token ile yeni bir giriş bağlantısı alır.
+                // Panel oturumu düştü: kabuk token ile yeni bir giriş bağlantısı alır (çıkışta değil).
                 "/admin/login" => {
-                    let _ = handle.emit("panel://session-expired", ());
+                    if !*handle.state::<AppState>().logging_out.lock().unwrap() {
+                        let _ = handle.emit("panel://session-expired", ());
+                    }
                     false
                 }
                 _ => true,
             }
         })
+        // target="_blank" ve window.open: varsayılan tarayıcıda.
+        .on_new_window(move |url, _features| {
+            open_in_browser(&browser, &url);
+            NewWindowResponse::Deny
+        })
+        .on_download(downloads::handle)
         .build()
         .map_err(|e| e.to_string())?;
     let _ = window.set_focus();
@@ -118,7 +140,37 @@ async fn close_panel(app: AppHandle) -> Result<(), String> {
     Ok(())
 }
 
-/// Panel penceresinde tam ekran (F11 ya da tepsi menüsü).
+/// Çekmece menü ve F11 (panel sayfasından): tam ekran, kilit, widget, indirilenler, hesap
+/// değiştirme (oturumu kapatır), uygulamayı kapatma.
+#[tauri::command]
+async fn panel_action(app: AppHandle, action: String) -> Result<(), String> {
+    match action.as_str() {
+        "fullscreen" => toggle_panel_fullscreen(&app),
+        "lock" => app.emit("app://lock", ()).map_err(|e| e.to_string())?,
+        "switch" => app.emit("app://accounts", ()).map_err(|e| e.to_string())?,
+        "widget" => {
+            toggle_widget_window(&app)?;
+        }
+        "downloads" => open_downloads(&app)?,
+        "quit" => app.exit(0),
+        _ => return Err(format!("bilinmeyen işlem: {action}")),
+    }
+    Ok(())
+}
+
+fn open_downloads(app: &AppHandle) -> Result<(), String> {
+    let dir = app.path().download_dir().map_err(|e| e.to_string())?;
+    app.opener().open_path(dir.to_string_lossy(), None::<&str>).map_err(|e| e.to_string())
+}
+
+/// Kabuk penceresinde F11 (ör. kilit ekranı tam ekran).
+#[tauri::command]
+fn toggle_window_fullscreen(window: WebviewWindow) {
+    let fullscreen = window.is_fullscreen().unwrap_or(false);
+    let _ = window.set_fullscreen(!fullscreen);
+}
+
+/// Panel penceresinde tam ekran (F11, çekmece menü ya da tepsi menüsü).
 fn toggle_panel_fullscreen(app: &AppHandle) {
     if let Some(panel) = app.get_webview_window(PANEL_LABEL) {
         let fullscreen = panel.is_fullscreen().unwrap_or(false);
@@ -144,8 +196,11 @@ fn set_locked(app: AppHandle, state: State<'_, AppState>, locked: bool) {
         if locked {
             let _ = shell.show();
             let _ = shell.set_focus();
-        } else if app.get_webview_window(PANEL_LABEL).is_some() {
-            let _ = shell.hide();
+        } else {
+            let _ = shell.set_fullscreen(false);
+            if app.get_webview_window(PANEL_LABEL).is_some() {
+                let _ = shell.hide();
+            }
         }
     }
     if !locked {
@@ -222,7 +277,7 @@ fn quit_app(app: AppHandle) {
 
 fn build_tray(app: &AppHandle) -> tauri::Result<()> {
     let open = MenuItem::with_id(app, "open", "Uygulamayı Aç", true, None::<&str>)?;
-    let accounts = MenuItem::with_id(app, "accounts", "Hesap Değiştir", true, None::<&str>)?;
+    let accounts = MenuItem::with_id(app, "accounts", "Hesap Değiştir (oturumu kapatır)", true, None::<&str>)?;
     let fullscreen = MenuItem::with_id(app, "fullscreen", "Tam Ekran (F11)", true, None::<&str>)?;
     let widget = MenuItem::with_id(app, "widget", "Masaüstü Widget'ı", true, None::<&str>)?;
     let lock = MenuItem::with_id(app, "lock", "Kilitle", true, None::<&str>)?;
@@ -289,6 +344,8 @@ pub fn run() {
             set_shell_visible,
             system_idle_seconds,
             toggle_widget,
+            toggle_window_fullscreen,
+            panel_action,
             set_tray_tooltip,
             quit_app
         ])

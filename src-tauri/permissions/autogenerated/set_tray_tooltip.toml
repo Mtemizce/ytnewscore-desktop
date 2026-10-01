@@ -1,0 +1,11 @@
+# Automatically generated - DO NOT EDIT!
+
+[[permission]]
+identifier = "allow-set-tray-tooltip"
+description = "Enables the set_tray_tooltip command without any pre-configured scope."
+commands.allow = ["set_tray_tooltip"]
+
+[[permission]]
+identifier = "deny-set-tray-tooltip"
+description = "Denies the set_tray_tooltip command without any pre-configured scope."
+commands.deny = ["set_tray_tooltip"]

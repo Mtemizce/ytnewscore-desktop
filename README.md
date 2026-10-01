@@ -17,7 +17,9 @@ Gereksinimler: Node.js 18+, Rust (https://rustup.rs). Windows'ta ayrıca Microso
 
 1. **Hesap ekle:** site adresi + e-posta/kullanıcı adı + şifre (2FA açıksa kod). Sunucu `/api/v1/auth/login` ile bir API token'ı verir; token bu bilgisayarda saklanır, şifre saklanmaz.
 2. **Hesabı aç:** kabuk token ile `/api/v1/auth/web-session`'dan 60 saniyelik tek kullanımlık giriş bağlantısı alır ve paneli `panel` penceresinde açar. Panel oturumu düşerse aynı yolla sessizce yeniden bağlanır.
-3. **Panelden çıkış** bu hesabın token'ını iptal eder, hesap listede "oturum kapalı" kalır. Başka sitelere giden bağlantılar varsayılan tarayıcıda açılır. Uzak panel sayfasına Tauri IPC verilmez.
+3. **Panelden çıkış** ve **Hesap Değiştir** bu hesabın token'ını iptal eder, panel kapanır; hesap listede "oturum kapalı" kalır ve yeniden girmek şifre ister (birden çok kişinin kullandığı bilgisayarda kimse başkasının paneline giremesin). Uygulama açılırken hatırlanan hesap kilit ekranıyla (şifre) açılır.
+4. Panel dışındaki adresler ("Sitede gör", "Siteye Git", başka siteler) ve yeni sekmeler varsayılan tarayıcıda açılır.
+5. Uzak panel sayfası yalnız `panel_action` komutunu çağırabilir (`capabilities/panel.json`; diğer komutlar `default.json`'da yalnız kabuk ve widget'a açık, `build.rs` izin listesi).
 
 ## Klasör yapısı
 
@@ -49,7 +51,9 @@ src-tauri/                 Rust kabuğu (src/lib.rs) ve izinler (capabilities/de
 - **Sistem tepsisi:** pencereleri kapatmak uygulamayı tepsiye gizler (bildirimler gelmeye devam eder). Menü: Uygulamayı Aç, Hesap Değiştir, Tam Ekran, Masaüstü Widget'ı, Kilitle, Çıkış. Simgenin ipucunda bekleyen yorum, okunmamış e-posta ve çevrimiçi ziyaretçi sayısı görünür.
 - **Bildirimler:** Reverb açıksa yeni bildirim anında, değilse dakikalık yoklamayla Windows bildirim merkezine düşer; başlık sitenin adı, sesli. Geliştirme modunda bildirimin üstündeki uygulama adı "Windows PowerShell" görünür, kurulu uygulamada "YTNewsCore".
 - **Masaüstü widget'ı:** küçük, çerçevesiz, her zaman üstte duran pencere; etkin hesabın sayıları Reverb'deki dakikalık Pano sinyaliyle ve yeni bildirimlerde anında yenilenir.
-- **Tam ekran:** panel penceresinde F11 ya da tepsi menüsü. Uzak sayfaya IPC verilmediği için F11, `on_navigation`'ın yakalayıp iptal ettiği `/__ytn-desktop/fullscreen` adresiyle haber verir.
+- **Çekmece menü** (panelin sağ kenarındaki tutamak; `src-tauri/src/panel-drawer.js`, Shadow DOM, web paneline dokunmaz): Tam Ekran, Kilitle, Masaüstü Widget'ı, İndirilenler Klasörü, Hesap Değiştir, Uygulamayı Kapat.
+- **Tam ekran:** panelde ve kilit ekranında F11; ayrıca çekmece ve tepsi menüsü.
+- **İndirmeler** (`src-tauri/src/downloads.rs`): İndirilenler klasörüne kaydedilir, sistem bildirimiyle haber verilir. Düz http'de (yerel geliştirme) WebView2 güvensiz indirmeyi engellediği için dosya panelin oturum çerezleriyle Rust tarafından çekilir (yalnız GET; toplu ZIP gibi POST indirmeleri yalnız HTTPS'te).
 - **Kilit ekranı:** tepsi menüsü, hesap seçicideki "Kilitle" ya da 15 dakika sistem hareketsizliği. Yalnız uygulamayı kilitler: panel gizlenir, kilit ekranı normal pencerede açılır, başka uygulamalara geçilebilir; şifreyle açılır.
 - **Hesap kartları:** fotoğraf, ad, unvan, e-posta, telefon ve bu cihazdaki son oturum tarihi.
 - Windows 11 widget panosu (Win+W) ve canlı duvar kâğıdı Tauri ile yapılamaz (Windows App SDK paketli uygulama gerekir); onun yerine yukarıdaki widget penceresi kullanılır.

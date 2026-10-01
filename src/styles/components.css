@@ -77,6 +77,7 @@
 .lock-input::placeholder { color: rgb(255 255 255 / 50%); }
 .lock-error { color: #fca5a5; font-size: var(--fs-sm); }
 .lock-link { color: #a5b4fc; }
+.lock-hint { color: rgb(255 255 255 / 35%); font-size: var(--fs-xs); }
 
 /* Sekmeler (Yorumlar: durumlar) */
 .tabs { display: flex; gap: 2px; padding: 0 12px; border-bottom: 1px solid var(--border); }
