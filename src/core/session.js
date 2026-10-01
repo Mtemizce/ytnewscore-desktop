@@ -1,44 +1,86 @@
-// Oturum bilgisi: sunucu adresi, token ve giriş yapan kullanıcı (localStorage).
+// Kayıtlı hesaplar (birden çok site/kullanıcı) ve etkin hesap; localStorage'da, tüm pencereler ortak.
+// Bir hesap: { id, baseUrl, token, user: {id, name, email, avatar_url}, siteName }.
 
-const KEYS = { url: 'api_base_url', token: 'api_token', user: 'api_user' };
+const KEYS = { accounts: 'accounts', active: 'active_account' };
 const DEFAULT_URL = 'http://ytnews.lv.local';
 
-export const session = {
-  get baseUrl() {
-    return localStorage.getItem(KEYS.url) || DEFAULT_URL;
-  },
-  set baseUrl(value) {
-    localStorage.setItem(KEYS.url, String(value).trim().replace(/\/+$/, ''));
+function read() {
+  try {
+    return JSON.parse(localStorage.getItem(KEYS.accounts) || '[]');
+  } catch {
+    return [];
+  }
+}
+
+function write(list) {
+  localStorage.setItem(KEYS.accounts, JSON.stringify(list));
+}
+
+export const accounts = {
+  list: read,
+
+  active() {
+    const id = localStorage.getItem(KEYS.active);
+
+    return read().find((a) => a.id === id) || null;
   },
 
-  get token() {
-    return localStorage.getItem(KEYS.token);
-  },
-  set token(value) {
-    value ? localStorage.setItem(KEYS.token, value) : localStorage.removeItem(KEYS.token);
+  activate(id) {
+    id ? localStorage.setItem(KEYS.active, id) : localStorage.removeItem(KEYS.active);
   },
 
-  get user() {
-    try {
-      return JSON.parse(localStorage.getItem(KEYS.user) || 'null');
-    } catch {
-      return null;
+  /** Aynı site + kullanıcı ikinci kez eklenirse günceller. */
+  upsert(account) {
+    const id = `${new URL(account.baseUrl).host}#${account.user.id}`;
+    const list = read().filter((a) => a.id !== id);
+    list.unshift({ ...account, id });
+    write(list);
+
+    return id;
+  },
+
+  update(id, changes) {
+    write(read().map((a) => (a.id === id ? { ...a, ...changes } : a)));
+  },
+
+  remove(id) {
+    write(read().filter((a) => a.id !== id));
+    if (localStorage.getItem(KEYS.active) === id) {
+      localStorage.removeItem(KEYS.active);
     }
-  },
-  set user(value) {
-    value ? localStorage.setItem(KEYS.user, JSON.stringify(value)) : localStorage.removeItem(KEYS.user);
-  },
-
-  clear() {
-    this.token = null;
-    this.user = null;
   },
 };
 
 /**
- * Düz http yalnız yerel geliştirme adreslerinde kabul edilir; şifre internette
- * yalnız HTTPS ile gitmeli (sunucu şifreyi zaten bcrypt ile saklar, istemci
- * hash'i ise şifrenin yerine geçeceği için koruma sağlamaz).
+ * İsteklerin gittiği adres ve token: etkin hesap; hesap eklerken (`withLogin`) girilen sunucu.
+ */
+export const session = {
+  override: null,
+
+  get baseUrl() {
+    return this.override?.baseUrl ?? accounts.active()?.baseUrl ?? DEFAULT_URL;
+  },
+
+  get token() {
+    return this.override ? (this.override.token ?? null) : (accounts.active()?.token ?? null);
+  },
+
+  async withLogin(baseUrl, callback) {
+    this.override = { baseUrl: String(baseUrl).trim().replace(/\/+$/, ''), token: null };
+    try {
+      return await callback();
+    } finally {
+      this.override = null;
+    }
+  },
+
+  defaultUrl: DEFAULT_URL,
+};
+
+/**
+ * Düz http yalnız yerel geliştirme adreslerinde kabul edilir; şifre internette yalnız HTTPS ile
+ * gitmeli (sunucu şifreyi bcrypt ile saklar; istemci hash'i şifrenin yerine geçeceği için koruma
+ * sağlamaz).
  */
 export function isInsecureRemote(url) {
   try {

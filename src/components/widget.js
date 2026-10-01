@@ -1,5 +1,5 @@
 // Masaüstü widget penceresi: Pano verisinin küçük, her zaman üstte duran özeti.
-import { connectRealtime } from '../core/realtime.js';
+import { connectRealtime, disconnectRealtime } from '../core/realtime.js';
 import { session } from '../core/session.js';
 import { showMainWindow, toggleWidget } from '../core/desktop.js';
 import { SERVICES, STAT_CARDS } from './stats-store.js';
@@ -17,10 +17,21 @@ export function widget() {
         this.$store.stats.start();
         this.listen();
       }
-      // Ana pencerede giriş/çıkış olunca (localStorage ortak) widget kendini günceller.
+      // Kabukta hesap değişince ya da çıkış olunca (localStorage ortak) widget etkin hesaba geçer.
+      let token = session.token;
       window.addEventListener('storage', () => {
-        this.signedIn = Boolean(session.token);
-        this.signedIn ? this.$store.stats.start() : this.$store.stats.stop();
+        if (session.token === token) {
+          return;
+        }
+        token = session.token;
+        this.signedIn = Boolean(token);
+        if (this.signedIn) {
+          this.$store.stats.start();
+          this.listen();
+        } else {
+          this.$store.stats.stop();
+          disconnectRealtime();
+        }
       });
     },
 

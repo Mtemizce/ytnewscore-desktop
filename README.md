@@ -1,6 +1,6 @@
 # YTNewsCore Masaüstü (Tauri 2 + Alpine.js)
 
-YTNewsCore sitesini `/api/v1` üzerinden yöneten hafif masaüstü uygulaması: haberler, köşe yazıları, kullanıcılar, sistem bildirimleri.
+YTNewsCore sitelerinin panelini masaüstü penceresinde açan hafif uygulama. Panelin ekranları sitenin kendisinden gelir (web'de ne varsa masaüstünde de odur); uygulamanın kendi kabuğu yalnız şunları yapar: hesap seçici (birden çok site/kullanıcı), kilit ekranı, sistem tepsisi, sistem bildirimleri ve masaüstü widget'ı.
 
 ## Çalıştırma
 
@@ -8,75 +8,52 @@ YTNewsCore sitesini `/api/v1` üzerinden yöneten hafif masaüstü uygulaması: 
 npm install
 npm run tauri dev      # geliştirme penceresi (sıcak yenileme)
 npm run tauri build    # kurulum dosyası → src-tauri/target/release/bundle/
-npm run dev            # yalnız arayüz, tarayıcıda http://localhost:1420
+npm run dev            # yalnız kabuk, tarayıcıda http://localhost:1420 (panel yeni sekmede açılır)
 ```
 
 Gereksinimler: Node.js 18+, Rust (https://rustup.rs). Windows'ta ayrıca Microsoft C++ Build Tools; WebView2 Windows 11'de hazır gelir.
+
+## Nasıl çalışır
+
+1. **Hesap ekle:** site adresi + e-posta/kullanıcı adı + şifre (2FA açıksa kod). Sunucu `/api/v1/auth/login` ile bir API token'ı verir; token bu bilgisayarda saklanır, şifre saklanmaz.
+2. **Hesabı aç:** kabuk token ile `/api/v1/auth/web-session`'dan 60 saniyelik tek kullanımlık giriş bağlantısı alır ve paneli `panel` penceresinde açar. Panel oturumu düşerse aynı yolla sessizce yeniden bağlanır.
+3. **Panelden çıkış** bu hesabın token'ını iptal eder, hesap listede "oturum kapalı" kalır. Başka sitelere giden bağlantılar varsayılan tarayıcıda açılır. Uzak panel sayfasına Tauri IPC verilmez.
 
 ## Klasör yapısı
 
 ```
 index.html                 boş kabuk (#app); her şey src/main.js'ten gelir
 src/
-  main.js                  açılış: stiller, görünümler, Alpine bileşenleri
-  core/                    uygulamadan bağımsız temel parçalar
-    session.js             sunucu adresi, token, kullanıcı (localStorage) + HTTPS denetimi
-    desktop.js             Rust kabuğuyla köprü: tepsi ipucu, widget, tepsiden kilitleme
-    panel.js               panel sayfasını (haber formu vb.) tek kullanımlık girişle ayrı pencerede açar
-    http.js                tek istek noktası: Bearer token, hata, 401'de oturum kapatma
+  main.js                  açılış: ana pencere kabuk, "widget" etiketli pencere widget
+  core/
+    session.js             kayıtlı hesaplar + etkin hesap (localStorage) + HTTPS denetimi
+    desktop.js             Rust köprüsü: panel penceresi, kilit, hareketsizlik, tepsi, widget
+    http.js                tek istek noktası: Bearer token, hata, 401'de hesabı "oturum kapalı" yapma
+    realtime.js            Reverb (Echo/pusher-js), kanal yetkisi token ile /api/v1/realtime/auth
     device.js              otomatik cihaz adı ("Windows 11 · BILGISAYAR-ADI")
-    notify.js              işletim sistemi bildirimleri
-    format.js              tarih, hata mesajı, baş harfler
-  api/
-    index.js               /api/v1 uçları (news, articles, users, notifications…)
-    form-data.js           görselli kayıtlar için multipart gövde
-  components/              Alpine bileşenleri (durum + davranış)
-    app-shell.js           giriş/çıkış (+2FA), menü (yetkiye göre), kilit ekranı, tam ekran, bildirimler
-    stats-store.js         Pano verisi (Pano, kilit ekranı, tepsi ve widget ortak)
-    widget.js              masaüstü widget penceresi (#widget)
-    list.js                ortak sayfalı tablo: arama, süzgeç, toplam, sayfalar
-    dashboard-section.js   Pano + Sunucu Durumu
-    content-section.js     Haberler + Köşe Yazıları (ekleme/düzenleme panel formunda)
-    inbox-section.js       Gelen Kutusu (hesaplar · liste · okuma)
-    comments-section.js    Yorum moderasyonu
-    forms-section.js       İletişim Formları ve gönderiler
-    pages-section.js       Sabit Sayfalar
-    ads-section.js         Reklamlar + Alanlar (yerel form)
-    social-section.js      Paylaşım geçmişi, platformlar, Telegram kanalları
-    users-section.js       Kullanıcılar
-    profile-section.js     Profilim (bilgiler, parola, 2FA)
-    auth-store.js          giriş yapan kullanıcı ve izinleri ($store.auth.can)
-    ui-store.js            paylaşılan durum: etkin bölüm, balon mesaj, onay penceresi
-  views/                   HTML parçaları; render.js açılışta birleştirir
-    app.html, login.html, shell.html, widget.html
-    sections/              her bölümün görünümü (dashboard, content, inbox, comments, forms, pages, ads, ads-form, social, users, profile)
-    partials/              pager, bell, lock, confirm, toast
-  styles/                  tokens (renkler) → base → layout → components → table → form → inbox → dashboard
-src-tauri/                 Rust kabuğu: eklentiler, sistem tepsisi, widget penceresi (src/lib.rs) ve izinler (capabilities/default.json)
+    notify.js              işletim sistemi bildirimleri (sesli)
+    format.js              hata mesajı, baş harfler
+  api/index.js             kabuğun kullandığı uçlar (auth, me, notifications, dashboard)
+  components/
+    app-shell.js           hesap seçici, hesap ekleme (+2FA), panel açma, kilit, bildirimler
+    stats-store.js         Pano sayıları (kilit ekranı, tepsi ipucu, widget)
+    widget.js              masaüstü widget penceresi
+    ui-store.js            balon mesaj, onay penceresi
+  views/                   accounts, login, widget, partials (lock, confirm, toast); render.js birleştirir
+  styles/                  tokens → base → layout → components → form → dashboard
+src-tauri/                 Rust kabuğu (src/lib.rs) ve izinler (capabilities/default.json)
 ```
-
-`views/` içinde bir parça başka birini `<!-- @include partials/pager -->` ile çağırır; değişken de verilebilir: `<!-- @include sections/content kind=news -->` (dosyada `{{kind}}`).
-
-## Yeni bir bölüm eklemek
-
-1. `src/api/index.js`: uçları ekleyin (`resource('/yol')` liste/göster/ekle/güncelle/sil verir).
-2. `src/components/xxx-section.js`: `{ ...paginatedList((p) => api.xxx.list(p)), ... }` ile bileşen.
-3. `src/views/sections/xxx.html`: tablo + `<!-- @include partials/pager -->`.
-4. `src/main.js`'te `Alpine.data(...)`, `shell.html`'de bölüm satırı, `app-shell.js` → `SECTIONS`'a menü girişi.
 
 ## Masaüstü özellikleri
 
-- **Sistem tepsisi:** pencereyi kapatmak uygulamayı tepsiye gizler (bildirimler gelmeye devam eder). Tepsi menüsü: Uygulamayı Aç, Masaüstü Widget'ı, Kilitle, Çıkış. Simgenin üzerine gelince bekleyen yorum, okunmamış e-posta ve çevrimiçi ziyaretçi sayısı görünür.
-- **Masaüstü widget'ı:** küçük, çerçevesiz, her zaman üstte duran pencere (sağ alt köşe, başlığından sürüklenir). Anlık ziyaretçi, haber, yorum, bekleyen yorum, okunmamış e-posta/form ve servis durumu dakikada bir yenilenir. Üst çubuktaki ekran simgesi ya da tepsi menüsüyle açılıp kapanır.
-- **Pano:** aynı sayılar ve Sunucu Durumu (kuyruk, zamanlayıcı, Redis, Reverb; izinle disk, veritabanı, işler, sürümler).
-- **Kilit ekranı:** düğme, Ctrl+L, tepsi menüsü ya da 15 dakika hareketsizlik; parola ile açılır, altında aynı özet sayılar görünür.
-- **Tam ekran:** F11 ya da üst çubuktaki düğme.
-- İşletim sisteminin kendi kilit ekranına widget koymak Tauri ile mümkün değil (Windows App SDK / WidgetKit gerekir); bunun yerine yukarıdaki widget penceresi ve uygulamanın kendi kilit ekranı kullanılır.
+- **Sistem tepsisi:** pencereleri kapatmak uygulamayı tepsiye gizler (bildirimler gelmeye devam eder). Menü: Uygulamayı Aç, Hesap Değiştir, Masaüstü Widget'ı, Kilitle, Çıkış. Simgenin ipucunda bekleyen yorum, okunmamış e-posta ve çevrimiçi ziyaretçi sayısı görünür.
+- **Bildirimler:** Reverb açıksa yeni bildirim anında, değilse dakikalık yoklamayla Windows bildirim merkezine düşer; başlık sitenin adı, sesli. Geliştirme modunda bildirimin üstündeki uygulama adı "Windows PowerShell" görünür, kurulu uygulamada "YTNewsCore".
+- **Masaüstü widget'ı:** küçük, çerçevesiz, her zaman üstte duran pencere; etkin hesabın sayıları Reverb'deki dakikalık Pano sinyaliyle ve yeni bildirimlerde anında yenilenir.
+- **Kilit ekranı:** tepsi menüsü, hesap seçicideki "Kilitle" ya da 15 dakika sistem hareketsizliği; panel gizlenir, şifreyle açılır.
+- Windows 11 widget panosu (Win+W) ve canlı duvar kâğıdı Tauri ile yapılamaz (Windows App SDK paketli uygulama gerekir); onun yerine yukarıdaki widget penceresi kullanılır.
 
 ## Notlar
 
-- **İstekler Rust tarafından gider** (`@tauri-apps/plugin-http`), CORS gerekmez. İzinli adresler `src-tauri/capabilities/default.json`: yerelde `http://localhost`, `127.0.0.1`, `*.local`, `*.test`; internette yalnız `https://`.
-- **Şifre:** istemcide hashlenmez; hash şifrenin yerine geçeceği için koruma sağlamaz. Koruma HTTPS'tir, sunucu şifreyi bcrypt ile saklar. Giriş ekranı, internetteki bir adres `http://` ise uyarır.
-- **Cihaz adı** otomatik gönderilir; bağlantılar sitede Admin Ayarlar › API › Bağlı Hesaplar'da IP adresiyle görünür ve oradan kesilebilir.
-- **Bildirimler:** uygulama dakikada bir `/api/v1/notifications`'ı yoklar; yeni okunmamış bildirimler Windows bildirim merkezine (macOS/Linux'ta sistem bildirimine) düşer. Zil menüsündeki "Dene" ile izin ve görünüm denenir.
-- **Güncellemede** gönderilmeyen etiket, galeri, yayın tarihi ve manşet bayrakları sunucuda korunur. Galeriden kaldırılan görseller `gallery_media_ids` ile, yeni görseller `gallery[]` ile gider.
+- **Kabuğun istekleri Rust tarafından gider** (`@tauri-apps/plugin-http`), CORS gerekmez. İzinli adresler `src-tauri/capabilities/default.json`: yerelde `http://localhost`, `127.0.0.1`, `*.local`, `*.test`; internette yalnız `https://`.
+- **Şifre:** istemcide hashlenmez; hash şifrenin yerine geçeceği için koruma sağlamaz. Koruma HTTPS'tir, sunucu şifreyi bcrypt ile saklar. Hesap ekleme ekranı, internetteki bir adres `http://` ise uyarır.
+- **Cihaz adı** otomatik gönderilir; bağlantılar sitede Ayarlar › API › Bağlı Hesaplar'da IP adresiyle görünür ve oradan kesilebilir.

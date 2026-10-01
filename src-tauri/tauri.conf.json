@@ -12,11 +12,12 @@
   "app": {
     "windows": [
       {
-        "title": "YTNewsCore Masaüstü",
-        "width": 1200,
-        "height": 760,
-        "minWidth": 900,
-        "minHeight": 560
+        "title": "YTNewsCore",
+        "width": 520,
+        "height": 660,
+        "minWidth": 420,
+        "minHeight": 560,
+        "center": true
       }
     ],
     "security": {

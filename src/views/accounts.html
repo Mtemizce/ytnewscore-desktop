@@ -1,0 +1,32 @@
+<div class="login">
+  <div class="login-card">
+    <div class="brand brand-dark">
+      <span class="brand-mark">YT</span>
+      <span>YTNews<b>Core</b> <small>Hesaplar</small></span>
+    </div>
+
+    <ul class="account-list">
+      <template x-for="account in list" :key="account.id">
+        <li class="account" :class="{ 'is-active': account.id === activeId }">
+          <button type="button" class="account-main" @click="open(account)" :disabled="opening !== null">
+            <img class="avatar" x-show="account.user?.avatar_url" :src="account.user?.avatar_url" alt="">
+            <span class="avatar" x-show="!account.user?.avatar_url" x-text="initials(account.user?.name)"></span>
+            <span class="account-text">
+              <b x-text="account.user?.name"></b>
+              <small x-text="account.siteName || account.baseUrl"></small>
+              <small class="account-state" x-show="!account.token">Oturum kapalı — giriş yapın</small>
+            </span>
+            <span class="account-go" x-text="opening === account.id ? 'Açılıyor…' : '›'"></span>
+          </button>
+          <button type="button" class="account-remove" title="Bu bilgisayardan kaldır" @click="removeAccount(account)">✕</button>
+        </li>
+      </template>
+    </ul>
+
+    <button type="button" class="btn btn-block" @click="startAdd()">+ Hesap Ekle</button>
+    <div class="account-tools">
+      <button type="button" class="link" x-show="active?.token" @click="lock()">Kilitle</button>
+      <button type="button" class="link" @click="testNotification()">Bildirimi dene</button>
+    </div>
+  </div>
+</div>

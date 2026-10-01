@@ -2,12 +2,12 @@
   <form class="login-card" @submit.prevent="doLogin" x-show="!twoFactor.challenge">
     <div class="brand brand-dark">
       <span class="brand-mark">YT</span>
-      <span>YTNews<b>Core</b> <small>Masaüstü</small></span>
+      <span>YTNews<b>Core</b> <small>Hesap Ekle</small></span>
     </div>
 
     <label class="field">
-      <span>Sunucu adresi</span>
-      <input class="input" x-model="login.baseUrl" placeholder="https://site.com" required>
+      <span>Site adresi</span>
+      <input class="input" x-model="form.baseUrl" placeholder="https://site.com" required>
     </label>
     <p class="hint hint-warn" x-show="insecureUrl">
       Bu adres HTTPS değil: şifre şifrelenmeden gider. Canlı sitede https:// kullanın.
@@ -15,12 +15,12 @@
 
     <label class="field">
       <span>E-posta ya da kullanıcı adı</span>
-      <input class="input" x-model="login.login" autocomplete="username" required>
+      <input class="input" x-model="form.login" autocomplete="username" required>
     </label>
 
     <label class="field">
       <span>Şifre</span>
-      <input class="input" type="password" x-model="login.password" autocomplete="current-password" required>
+      <input class="input" type="password" x-model="form.password" autocomplete="current-password" required>
     </label>
 
     <p class="alert alert-error" x-show="loginError" x-text="loginError"></p>
@@ -28,6 +28,7 @@
     <button class="btn btn-primary btn-block" :disabled="loggingIn">
       <span x-text="loggingIn ? 'Giriş yapılıyor…' : 'Giriş Yap'"></span>
     </button>
+    <button type="button" class="link" x-show="list.length" @click="showAccounts()">‹ Hesaplara dön</button>
     <p class="hint">Cihaz adı otomatik gönderilir; bağlantıyı panelde Ayarlar › API › Bağlı Hesaplar'dan kesebilirsiniz.</p>
   </form>
 

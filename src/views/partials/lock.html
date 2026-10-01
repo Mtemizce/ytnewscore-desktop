@@ -1,4 +1,4 @@
-<div class="lock" x-show="authenticated && locked" x-transition.opacity>
+<div class="lock" x-show="locked" x-transition.opacity>
   <form class="lock-card" @submit.prevent="unlock()">
     <img class="avatar avatar-xl" x-show="user?.avatar_url" :src="user?.avatar_url" alt="">
     <span class="avatar avatar-xl" x-show="!user?.avatar_url" x-text="initials(user?.name)"></span>
@@ -6,7 +6,7 @@
     <input class="input lock-input" type="password" data-unlock-input x-model="unlockPassword" placeholder="Parola" autocomplete="current-password" required>
     <p class="lock-error" x-show="unlockError" x-text="unlockError"></p>
     <button class="btn btn-primary btn-block" :disabled="unlocking" x-text="unlocking ? 'Açılıyor…' : 'Kilidi Aç'"></button>
-    <button type="button" class="link lock-link" @click="logout()">Farklı hesapla giriş yap</button>
+    <button type="button" class="link lock-link" @click="signOutActive()">Bu hesaptan çık</button>
   </form>
   <div class="lock-stats">
     <div class="lock-stat"><b x-text="$store.stats.value('live_visitors')"></b><span>anlık ziyaretçi</span></div>

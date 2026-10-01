@@ -1,8 +1,7 @@
-// Bölümler arası paylaşılan arayüz durumu: etkin bölüm, bildirim balonu, onay penceresi.
+// Paylaşılan arayüz durumu: bildirim balonu, onay penceresi.
 // Bileşenlerden $store.ui ile erişilir.
 
 export const uiStore = {
-  section: 'dashboard',
 
   toast: { visible: false, type: 'success', message: '' },
   toastTimer: null,

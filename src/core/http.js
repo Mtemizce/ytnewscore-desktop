@@ -44,8 +44,8 @@ export async function request(method, path, body) {
     throw new ApiError(0, { message: `Sunucuya ulaşılamadı: ${error?.message || error}` });
   }
 
-  if (response.status === 401 && session.token) {
-    session.clear();
+  // Etkin hesabın token'ı geçersiz (bağlantı panelden kesildi vb.): kabuk hesabı "oturum kapalı" yapar.
+  if (response.status === 401 && session.token && !session.override) {
     onUnauthorized();
   }
   if (response.status === 204) {

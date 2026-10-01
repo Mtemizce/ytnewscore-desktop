@@ -1,28 +1,153 @@
-// Uygulama kabuğu: eklentiler, sistem tepsisi ve masaüstü widget penceresi.
+// Masaüstü kabuğu: panel penceresi (sitenin paneli), kabuk penceresi (hesap seçici + kilit),
+// masaüstü widget'ı, sistem tepsisi ve bildirim eklentileri.
+use std::sync::Mutex;
+
 use tauri::{
     menu::{Menu, MenuItem, PredefinedMenuItem},
     tray::{MouseButton, MouseButtonState, TrayIconBuilder, TrayIconEvent},
-    AppHandle, Emitter, Manager, WebviewUrl, WebviewWindowBuilder, WindowEvent,
+    AppHandle, Emitter, Manager, State, Url, WebviewUrl, WebviewWindowBuilder, WindowEvent,
 };
+use tauri_plugin_opener::OpenerExt;
 
 const TRAY_ID: &str = "main";
+const SHELL_LABEL: &str = "main";
+const PANEL_LABEL: &str = "panel";
 const WIDGET_LABEL: &str = "widget";
 
-/// Ana pencereyi gösterir ve öne getirir (tepsiden ya da widget'tan).
-#[tauri::command]
-fn show_main(app: AppHandle) {
-    if let Some(window) = app.get_webview_window("main") {
+/// Kilitliyken panel gösterilmez; tepsi "Aç" kabuğu (kilit ekranı) gösterir.
+#[derive(Default)]
+struct AppState {
+    locked: Mutex<bool>,
+}
+
+fn show_window(app: &AppHandle, label: &str) {
+    if let Some(window) = app.get_webview_window(label) {
         let _ = window.unminimize();
         let _ = window.show();
         let _ = window.set_focus();
     }
 }
 
-/// Masaüstü widget'ını açar/kapatır: küçük, çerçevesiz, her zaman üstte, görev çubuğunda yok,
-/// sağ alt köşede. Aynı ön yüzü yükler; ön yüz kendini pencere etiketinden ("widget") tanır,
-/// oturum ve token ortaktır. Tek pencere: açıksa kapatır.
-///
-/// `async`: Windows'ta senkron bir komutun içinden pencere oluşturmak kilitlenir (donma).
+/// Tepsi / widget "Aç": kilitliyse kilit ekranı, panel açıksa panel, değilse hesap seçici.
+fn open_app(app: &AppHandle) {
+    let locked = *app.state::<AppState>().locked.lock().unwrap();
+    if !locked && app.get_webview_window(PANEL_LABEL).is_some() {
+        show_window(app, PANEL_LABEL);
+    } else {
+        show_window(app, SHELL_LABEL);
+    }
+}
+
+#[tauri::command]
+fn show_main(app: AppHandle) {
+    open_app(&app);
+}
+
+/// Panel penceresini açar ya da var olanı verilen adrese götürür (tek kullanımlık giriş bağlantısı).
+/// Panelden çıkış hesap seçiciye döndürür, düşen oturum kabukta yeniden bağlanır, başka sitelere
+/// giden bağlantılar varsayılan tarayıcıda açılır. Uzak sayfaya Tauri IPC verilmez.
+/// `async`: Windows'ta senkron komut içinden pencere oluşturmak kilitlenir.
+#[tauri::command]
+async fn open_panel(app: AppHandle, url: String, title: String) -> Result<(), String> {
+    let target: Url = url.parse().map_err(|e: url::ParseError| e.to_string())?;
+
+    if let Some(window) = app.get_webview_window(PANEL_LABEL) {
+        window.navigate(target).map_err(|e| e.to_string())?;
+        let _ = window.set_title(&title);
+        show_window(&app, PANEL_LABEL);
+        return Ok(());
+    }
+
+    let host = target.host_str().unwrap_or_default().to_string();
+    let handle = app.clone();
+    let window = WebviewWindowBuilder::new(&app, PANEL_LABEL, WebviewUrl::External(target))
+        .title(&title)
+        .inner_size(1360.0, 860.0)
+        .min_inner_size(960.0, 600.0)
+        .center()
+        .on_navigation(move |next| {
+            if next.host_str().unwrap_or_default() != host {
+                let _ = handle.opener().open_url(next.as_str(), None::<&str>);
+                return false;
+            }
+            match next.path() {
+                // Panelden çıkış: uygulama da bu hesabın panelini kapatır, hesap seçiciye döner.
+                "/admin/logout" => {
+                    let _ = handle.emit("panel://logout", ());
+                    true
+                }
+                // Panel oturumu düştü: kabuk token ile yeni bir giriş bağlantısı alır.
+                "/admin/login" => {
+                    let _ = handle.emit("panel://session-expired", ());
+                    false
+                }
+                _ => true,
+            }
+        })
+        .build()
+        .map_err(|e| e.to_string())?;
+    let _ = window.set_focus();
+
+    Ok(())
+}
+
+/// Hesaptan çıkış / hesap değiştirme: panel penceresi kapanır (çerezler bir sonraki girişte değişir).
+#[tauri::command]
+async fn close_panel(app: AppHandle) -> Result<(), String> {
+    if let Some(window) = app.get_webview_window(PANEL_LABEL) {
+        window.destroy().map_err(|e| e.to_string())?;
+    }
+    Ok(())
+}
+
+/// Kilit: panel gizlenir, kabuk tam ekran kilit ekranını gösterir. Açılınca tersi.
+#[tauri::command]
+fn set_locked(app: AppHandle, state: State<'_, AppState>, locked: bool) {
+    *state.locked.lock().unwrap() = locked;
+    if let Some(panel) = app.get_webview_window(PANEL_LABEL) {
+        let _ = if locked { panel.hide() } else { panel.show() };
+    }
+    if let Some(shell) = app.get_webview_window(SHELL_LABEL) {
+        let _ = shell.set_fullscreen(locked);
+        let _ = shell.set_always_on_top(locked);
+        if locked {
+            let _ = shell.show();
+            let _ = shell.set_focus();
+        } else if app.get_webview_window(PANEL_LABEL).is_some() {
+            let _ = shell.hide();
+        }
+    }
+    if !locked {
+        if let Some(panel) = app.get_webview_window(PANEL_LABEL) {
+            let _ = panel.set_focus();
+        }
+    }
+}
+
+/// Panel açılınca kabuk (hesap seçici) gizlenir; hesap seçmek için yeniden gösterilir.
+#[tauri::command]
+fn set_shell_visible(app: AppHandle, visible: bool) {
+    if let Some(shell) = app.get_webview_window(SHELL_LABEL) {
+        let _ = if visible { shell.show().and_then(|_| shell.set_focus()) } else { shell.hide() };
+    }
+}
+
+/// İşletim sisteminde son klavye/fare hareketinden bu yana geçen saniye (hareketsizlik kilidi).
+#[tauri::command]
+fn system_idle_seconds() -> u64 {
+    #[cfg(windows)]
+    unsafe {
+        use windows_sys::Win32::System::SystemInformation::GetTickCount;
+        use windows_sys::Win32::UI::Input::KeyboardAndMouse::{GetLastInputInfo, LASTINPUTINFO};
+        let mut info = LASTINPUTINFO { cbSize: std::mem::size_of::<LASTINPUTINFO>() as u32, dwTime: 0 };
+        if GetLastInputInfo(&mut info) != 0 {
+            return u64::from(GetTickCount().wrapping_sub(info.dwTime)) / 1000;
+        }
+    }
+    0
+}
+
+/// Masaüstü widget'ı (tek pencere): açıksa kapatır. Aynı ön yüzü yükler, kendini etiketinden tanır.
 #[tauri::command]
 async fn toggle_widget(app: AppHandle) -> Result<bool, String> {
     toggle_widget_window(&app)
@@ -52,7 +177,6 @@ fn toggle_widget_window(app: &AppHandle) -> Result<bool, String> {
     Ok(true)
 }
 
-/// Tepsi simgesinin ipucu metni (ör. "3 bekleyen yorum · 12 çevrimiçi").
 #[tauri::command]
 fn set_tray_tooltip(app: AppHandle, text: String) {
     if let Some(tray) = app.tray_by_id(TRAY_ID) {
@@ -60,7 +184,6 @@ fn set_tray_tooltip(app: AppHandle, text: String) {
     }
 }
 
-/// Uygulamadan gerçekten çıkış (pencereyi kapatmak tepsiye gizler).
 #[tauri::command]
 fn quit_app(app: AppHandle) {
     app.exit(0);
@@ -68,23 +191,26 @@ fn quit_app(app: AppHandle) {
 
 fn build_tray(app: &AppHandle) -> tauri::Result<()> {
     let open = MenuItem::with_id(app, "open", "Uygulamayı Aç", true, None::<&str>)?;
+    let accounts = MenuItem::with_id(app, "accounts", "Hesap Değiştir", true, None::<&str>)?;
     let widget = MenuItem::with_id(app, "widget", "Masaüstü Widget'ı", true, None::<&str>)?;
     let lock = MenuItem::with_id(app, "lock", "Kilitle", true, None::<&str>)?;
     let quit = MenuItem::with_id(app, "quit", "Çıkış", true, None::<&str>)?;
     let separator = PredefinedMenuItem::separator(app)?;
-    let menu = Menu::with_items(app, &[&open, &widget, &lock, &separator, &quit])?;
+    let menu = Menu::with_items(app, &[&open, &accounts, &widget, &lock, &separator, &quit])?;
 
     let mut builder = TrayIconBuilder::with_id(TRAY_ID)
         .tooltip("YTNewsCore")
         .menu(&menu)
         .show_menu_on_left_click(false)
         .on_menu_event(|app, event| match event.id.as_ref() {
-            "open" => show_main(app.clone()),
+            "open" => open_app(app),
+            "accounts" => {
+                let _ = app.emit("app://accounts", ());
+            }
             "widget" => {
                 let _ = toggle_widget_window(app);
             }
             "lock" => {
-                show_main(app.clone());
                 let _ = app.emit("app://lock", ());
             }
             "quit" => app.exit(0),
@@ -92,7 +218,7 @@ fn build_tray(app: &AppHandle) -> tauri::Result<()> {
         })
         .on_tray_icon_event(|tray, event| {
             if let TrayIconEvent::Click { button: MouseButton::Left, button_state: MouseButtonState::Up, .. } = event {
-                show_main(tray.app_handle().clone());
+                open_app(tray.app_handle());
             }
         });
 
@@ -108,24 +234,33 @@ fn build_tray(app: &AppHandle) -> tauri::Result<()> {
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
-        // API istekleri Rust tarafından atılır (CORS yok); izinli adresler capabilities/default.json.
+        .manage(AppState::default())
+        // Kabuğun API istekleri Rust tarafından atılır (CORS yok); izinli adresler capabilities/default.json.
         .plugin(tauri_plugin_http::init())
-        // İşletim sisteminin kendi bildirimleri (Windows bildirim merkezi, macOS, Linux).
+        // İşletim sisteminin kendi bildirimleri.
         .plugin(tauri_plugin_notification::init())
         // Cihaz adı için işletim sistemi ve bilgisayar adı.
         .plugin(tauri_plugin_os::init())
-        .invoke_handler(tauri::generate_handler![show_main, toggle_widget, set_tray_tooltip, quit_app])
+        // Panelden çıkan bağlantılar varsayılan tarayıcıda.
+        .plugin(tauri_plugin_opener::init())
+        .invoke_handler(tauri::generate_handler![
+            show_main,
+            open_panel,
+            close_panel,
+            set_locked,
+            set_shell_visible,
+            system_idle_seconds,
+            toggle_widget,
+            set_tray_tooltip,
+            quit_app
+        ])
         .setup(|app| {
             build_tray(app.handle())?;
-            // Geliştirme denemesi: YTN_OPEN_WIDGET=1 ile widget açılışta açılır.
-            if cfg!(debug_assertions) && std::env::var("YTN_OPEN_WIDGET").as_deref() == Ok("1") {
-                let _ = toggle_widget_window(app.handle());
-            }
             Ok(())
         })
-        // Ana pencereyi kapatmak uygulamayı tepsiye gizler; çıkış tepsi menüsünden.
+        // Pencereleri kapatmak uygulamayı tepsiye gizler; çıkış tepsi menüsünden.
         .on_window_event(|window, event| {
-            if window.label() == "main" {
+            if matches!(window.label(), SHELL_LABEL | PANEL_LABEL) {
                 if let WindowEvent::CloseRequested { api, .. } = event {
                     api.prevent_close();
                     let _ = window.hide();
