@@ -3,7 +3,7 @@
 import { api } from '../api/index.js';
 import { deviceName } from '../core/device.js';
 import { closePanel, onShellEvent, openPanel, setLocked, setShellVisible, systemIdleSeconds } from '../core/desktop.js';
-import { errorMessage, initials } from '../core/format.js';
+import { errorMessage, formatDate, initials } from '../core/format.js';
 import { whenUnauthorized } from '../core/http.js';
 import { systemNotify } from '../core/notify.js';
 import { connectRealtime, disconnectRealtime } from '../core/realtime.js';
@@ -35,6 +35,7 @@ export function appShell() {
     idleTimer: null,
 
     initials,
+    formatDate,
 
     init() {
       whenUnauthorized(() => this.markSignedOut(this.activeId, 'Bu hesabın bağlantısı kesildi; yeniden giriş yapın.'));
@@ -95,7 +96,7 @@ export function appShell() {
         accounts.activate(account.id);
         this.refreshList();
         const [me, info, link] = await Promise.all([api.me.show(), api.info().catch(() => null), api.auth.webSession('/admin')]);
-        accounts.update(account.id, { user: me.data, siteName: info?.name || account.siteName });
+        accounts.update(account.id, { user: me.data, siteName: info?.name || account.siteName, lastOpenedAt: new Date().toISOString() });
         this.refreshList();
         await openPanel(link.url, `${this.active.siteName || 'Panel'} — YTNewsCore`);
         setShellVisible(false);

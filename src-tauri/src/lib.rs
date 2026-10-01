@@ -14,6 +14,18 @@ const SHELL_LABEL: &str = "main";
 const PANEL_LABEL: &str = "panel";
 const WIDGET_LABEL: &str = "widget";
 
+/// Uzak panel sayfasına IPC verilmez; F11 bu adrese gitmeye çalışır, `on_navigation` yakalayıp
+/// iptal eder ve tam ekranı açar/kapatır.
+const FULLSCREEN_PATH: &str = "/__ytn-desktop/fullscreen";
+const PANEL_SCRIPT: &str = r#"
+document.addEventListener('keydown', function (event) {
+  if (event.key === 'F11') {
+    event.preventDefault();
+    window.location.assign('/__ytn-desktop/fullscreen');
+  }
+}, true);
+"#;
+
 /// Kilitliyken panel gösterilmez; tepsi "Aç" kabuğu (kilit ekranı) gösterir.
 #[derive(Default)]
 struct AppState {
@@ -65,7 +77,13 @@ async fn open_panel(app: AppHandle, url: String, title: String) -> Result<(), St
         .inner_size(1360.0, 860.0)
         .min_inner_size(960.0, 600.0)
         .center()
+        .initialization_script(PANEL_SCRIPT)
         .on_navigation(move |next| {
+            if next.path() == FULLSCREEN_PATH {
+                let app = handle.clone();
+                tauri::async_runtime::spawn(async move { toggle_panel_fullscreen(&app) });
+                return false;
+            }
             if next.host_str().unwrap_or_default() != host {
                 let _ = handle.opener().open_url(next.as_str(), None::<&str>);
                 return false;
@@ -100,16 +118,29 @@ async fn close_panel(app: AppHandle) -> Result<(), String> {
     Ok(())
 }
 
-/// Kilit: panel gizlenir, kabuk tam ekran kilit ekranını gösterir. Açılınca tersi.
+/// Panel penceresinde tam ekran (F11 ya da tepsi menüsü).
+fn toggle_panel_fullscreen(app: &AppHandle) {
+    if let Some(panel) = app.get_webview_window(PANEL_LABEL) {
+        let fullscreen = panel.is_fullscreen().unwrap_or(false);
+        let _ = panel.set_fullscreen(!fullscreen);
+        let _ = panel.set_focus();
+    }
+}
+
+/// Kilit yalnız uygulamayı kilitler: panel gizlenir, kabuk normal pencerede kilit ekranını
+/// gösterir; bilgisayarda başka uygulamalara geçilebilir. Açılınca panel geri gelir.
 #[tauri::command]
 fn set_locked(app: AppHandle, state: State<'_, AppState>, locked: bool) {
     *state.locked.lock().unwrap() = locked;
     if let Some(panel) = app.get_webview_window(PANEL_LABEL) {
-        let _ = if locked { panel.hide() } else { panel.show() };
+        if locked {
+            let _ = panel.set_fullscreen(false);
+            let _ = panel.hide();
+        } else {
+            let _ = panel.show();
+        }
     }
     if let Some(shell) = app.get_webview_window(SHELL_LABEL) {
-        let _ = shell.set_fullscreen(locked);
-        let _ = shell.set_always_on_top(locked);
         if locked {
             let _ = shell.show();
             let _ = shell.set_focus();
@@ -192,11 +223,12 @@ fn quit_app(app: AppHandle) {
 fn build_tray(app: &AppHandle) -> tauri::Result<()> {
     let open = MenuItem::with_id(app, "open", "Uygulamayı Aç", true, None::<&str>)?;
     let accounts = MenuItem::with_id(app, "accounts", "Hesap Değiştir", true, None::<&str>)?;
+    let fullscreen = MenuItem::with_id(app, "fullscreen", "Tam Ekran (F11)", true, None::<&str>)?;
     let widget = MenuItem::with_id(app, "widget", "Masaüstü Widget'ı", true, None::<&str>)?;
     let lock = MenuItem::with_id(app, "lock", "Kilitle", true, None::<&str>)?;
     let quit = MenuItem::with_id(app, "quit", "Çıkış", true, None::<&str>)?;
     let separator = PredefinedMenuItem::separator(app)?;
-    let menu = Menu::with_items(app, &[&open, &accounts, &widget, &lock, &separator, &quit])?;
+    let menu = Menu::with_items(app, &[&open, &accounts, &fullscreen, &widget, &lock, &separator, &quit])?;
 
     let mut builder = TrayIconBuilder::with_id(TRAY_ID)
         .tooltip("YTNewsCore")
@@ -206,6 +238,12 @@ fn build_tray(app: &AppHandle) -> tauri::Result<()> {
             "open" => open_app(app),
             "accounts" => {
                 let _ = app.emit("app://accounts", ());
+            }
+            "fullscreen" => {
+                if !*app.state::<AppState>().locked.lock().unwrap() {
+                    show_window(app, PANEL_LABEL);
+                    toggle_panel_fullscreen(app);
+                }
             }
             "widget" => {
                 let _ = toggle_widget_window(app);

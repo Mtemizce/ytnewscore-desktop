@@ -46,10 +46,12 @@ src-tauri/                 Rust kabuğu (src/lib.rs) ve izinler (capabilities/de
 
 ## Masaüstü özellikleri
 
-- **Sistem tepsisi:** pencereleri kapatmak uygulamayı tepsiye gizler (bildirimler gelmeye devam eder). Menü: Uygulamayı Aç, Hesap Değiştir, Masaüstü Widget'ı, Kilitle, Çıkış. Simgenin ipucunda bekleyen yorum, okunmamış e-posta ve çevrimiçi ziyaretçi sayısı görünür.
+- **Sistem tepsisi:** pencereleri kapatmak uygulamayı tepsiye gizler (bildirimler gelmeye devam eder). Menü: Uygulamayı Aç, Hesap Değiştir, Tam Ekran, Masaüstü Widget'ı, Kilitle, Çıkış. Simgenin ipucunda bekleyen yorum, okunmamış e-posta ve çevrimiçi ziyaretçi sayısı görünür.
 - **Bildirimler:** Reverb açıksa yeni bildirim anında, değilse dakikalık yoklamayla Windows bildirim merkezine düşer; başlık sitenin adı, sesli. Geliştirme modunda bildirimin üstündeki uygulama adı "Windows PowerShell" görünür, kurulu uygulamada "YTNewsCore".
 - **Masaüstü widget'ı:** küçük, çerçevesiz, her zaman üstte duran pencere; etkin hesabın sayıları Reverb'deki dakikalık Pano sinyaliyle ve yeni bildirimlerde anında yenilenir.
-- **Kilit ekranı:** tepsi menüsü, hesap seçicideki "Kilitle" ya da 15 dakika sistem hareketsizliği; panel gizlenir, şifreyle açılır.
+- **Tam ekran:** panel penceresinde F11 ya da tepsi menüsü. Uzak sayfaya IPC verilmediği için F11, `on_navigation`'ın yakalayıp iptal ettiği `/__ytn-desktop/fullscreen` adresiyle haber verir.
+- **Kilit ekranı:** tepsi menüsü, hesap seçicideki "Kilitle" ya da 15 dakika sistem hareketsizliği. Yalnız uygulamayı kilitler: panel gizlenir, kilit ekranı normal pencerede açılır, başka uygulamalara geçilebilir; şifreyle açılır.
+- **Hesap kartları:** fotoğraf, ad, unvan, e-posta, telefon ve bu cihazdaki son oturum tarihi.
 - Windows 11 widget panosu (Win+W) ve canlı duvar kâğıdı Tauri ile yapılamaz (Windows App SDK paketli uygulama gerekir); onun yerine yukarıdaki widget penceresi kullanılır.
 
 ## Notlar

@@ -13,9 +13,9 @@
     "windows": [
       {
         "title": "YTNewsCore",
-        "width": 520,
-        "height": 660,
-        "minWidth": 420,
+        "width": 860,
+        "height": 640,
+        "minWidth": 480,
         "minHeight": 560,
         "center": true
       }
