@@ -1,5 +1,6 @@
-// Panelden indirmeler (haber ZIP'i, veritabanı yedeği…) İndirilenler klasörüne kaydedilir ve
-// sistem bildirimiyle haber verilir.
+// Panelden indirmeler (haber ZIP'i, veritabanı yedeği…) İndirilenler klasörüne kaydedilir; durum
+// panelin içinde bir kartla (İndiriliyor… → İndirildi: Aç / Klasörde göster) ve sesli sistem
+// bildirimiyle gösterilir.
 //
 // HTTPS'te WebView2 dosyayı kendisi indirir. Düz http'de (yerel geliştirme) WebView2 "güvensiz
 // indirme" diye engeller; o zaman indirme iptal edilir ve dosya panelin oturum çerezleriyle Rust
@@ -7,37 +8,62 @@
 use std::{
     io::Write,
     path::{Path, PathBuf},
+    sync::{
+        atomic::{AtomicU64, Ordering},
+        Mutex,
+    },
 };
 
 use tauri::{webview::DownloadEvent, AppHandle, Manager, Runtime, Url, Webview};
 use tauri_plugin_http::reqwest::{self, header};
 use tauri_plugin_notification::NotificationExt;
+use tauri_plugin_opener::OpenerExt;
 
 const FALLBACK_NAME: &str = "indirilen-dosya";
+
+/// Kartlardaki "Aç" / "Klasörde göster" son indirilen dosyaya uygulanır.
+#[derive(Default)]
+pub struct DownloadState {
+    last: Mutex<Option<PathBuf>>,
+    next_id: AtomicU64,
+}
+
+/// Son indirilen dosyayı açar ya da klasöründe seçili gösterir.
+pub fn open_last<R: Runtime>(app: &AppHandle<R>, reveal: bool) -> Result<(), String> {
+    let path = app.state::<DownloadState>().last.lock().unwrap().clone().ok_or("Henüz indirilen dosya yok.")?;
+    if reveal {
+        app.opener().reveal_item_in_dir(&path).map_err(|e| e.to_string())
+    } else {
+        app.opener().open_path(path.to_string_lossy(), None::<&str>).map_err(|e| e.to_string())
+    }
+}
 
 pub fn handle<R: Runtime>(webview: Webview<R>, event: DownloadEvent<'_>) -> bool {
     match event {
         DownloadEvent::Requested { url, destination } => {
             if url.scheme() == "http" {
+                let id = format!("d{}", webview.app_handle().state::<DownloadState>().next_id.fetch_add(1, Ordering::Relaxed));
+                card(&webview, &id, "started", "", None);
                 tauri::async_runtime::spawn(async move {
                     let result = fetch_with_session(&webview, url).await;
-                    notify(webview.app_handle(), result);
+                    finish(&webview, &id, result);
                 });
                 return false;
             }
+            let name = destination.file_name().map(|n| n.to_string_lossy().into_owned()).unwrap_or_default();
             if let Ok(dir) = webview.app_handle().path().download_dir() {
-                let name = destination.file_name().map(|n| n.to_string_lossy().into_owned()).unwrap_or_default();
                 *destination = unique_path(&dir, &sanitize(&name));
             }
+            card(&webview, url.as_str(), "started", &name, None);
             true
         }
-        DownloadEvent::Finished { path, success, .. } => {
+        DownloadEvent::Finished { url, path, success } => {
             let result = match (success, path) {
                 (true, Some(path)) => Ok(path),
                 (true, None) => Err("Dosya kaydedildi ama yeri bildirilmedi.".to_string()),
                 (false, _) => Err("İndirme tamamlanamadı.".to_string()),
             };
-            notify(webview.app_handle(), result);
+            finish(&webview, url.as_str(), result);
             true
         }
         _ => true,
@@ -86,15 +112,28 @@ async fn fetch_with_session<R: Runtime>(webview: &Webview<R>, url: Url) -> Resul
     Ok(path)
 }
 
-fn notify<R: Runtime>(app: &AppHandle<R>, result: Result<PathBuf, String>) {
-    let (title, body) = match result {
-        Ok(path) => (
-            "İndirildi",
-            format!("{} — İndirilenler klasörü", path.file_name().map(|n| n.to_string_lossy().into_owned()).unwrap_or_default()),
-        ),
-        Err(error) => ("İndirilemedi", error),
+/// Panel sayfasındaki indirme kartı (panel-drawer.js `__ytnDownload`).
+fn card<R: Runtime>(webview: &Webview<R>, id: &str, status: &str, name: &str, message: Option<&str>) {
+    let payload = serde_json::json!({ "id": id, "status": status, "name": name, "message": message });
+    let _ = webview.eval(format!("window.__ytnDownload && window.__ytnDownload({payload})"));
+}
+
+/// Biten indirme: kart güncellenir, sesli sistem bildirimi gider, "Aç" için yol saklanır.
+fn finish<R: Runtime>(webview: &Webview<R>, id: &str, result: Result<PathBuf, String>) {
+    let app = webview.app_handle();
+    let (title, body) = match &result {
+        Ok(path) => {
+            let name = path.file_name().map(|n| n.to_string_lossy().into_owned()).unwrap_or_default();
+            *app.state::<DownloadState>().last.lock().unwrap() = Some(path.clone());
+            card(webview, id, "done", &name, Some("İndirilenler klasörüne kaydedildi."));
+            ("İndirildi", format!("{name} — İndirilenler klasörü"))
+        }
+        Err(error) => {
+            card(webview, id, "failed", "", Some(error));
+            ("İndirilemedi", error.clone())
+        }
     };
-    let _ = app.notification().builder().title(title).body(body).show();
+    let _ = app.notification().builder().title(title).body(body).sound("Default").show();
 }
 
 /// `filename*=UTF-8''…` (öncelikli) ya da `filename="…"`.

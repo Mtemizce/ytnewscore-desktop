@@ -152,6 +152,8 @@ async fn panel_action(app: AppHandle, action: String) -> Result<(), String> {
             toggle_widget_window(&app)?;
         }
         "downloads" => open_downloads(&app)?,
+        "open-download" => downloads::open_last(&app, false)?,
+        "reveal-download" => downloads::open_last(&app, true)?,
         "quit" => app.exit(0),
         _ => return Err(format!("bilinmeyen işlem: {action}")),
     }
@@ -328,6 +330,7 @@ fn build_tray(app: &AppHandle) -> tauri::Result<()> {
 pub fn run() {
     tauri::Builder::default()
         .manage(AppState::default())
+        .manage(downloads::DownloadState::default())
         // Kabuğun API istekleri Rust tarafından atılır (CORS yok); izinli adresler capabilities/default.json.
         .plugin(tauri_plugin_http::init())
         // İşletim sisteminin kendi bildirimleri.
