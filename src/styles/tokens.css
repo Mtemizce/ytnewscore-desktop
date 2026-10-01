@@ -1,0 +1,53 @@
+/* Renk ve ölçü belirteçleri: panelin (slate + indigo) sade karşılığı. Koyu tema aynı adlarla. */
+:root {
+  --bg: #f1f5f9;
+  --surface: #ffffff;
+  --surface-muted: #f8fafc;
+  --border: #e2e8f0;
+  --text: #0f172a;
+  --text-soft: #475569;
+  --text-muted: #94a3b8;
+
+  --primary: #4f46e5;
+  --primary-hover: #4338ca;
+  --primary-soft: #eef2ff;
+  --danger: #dc2626;
+  --danger-soft: #fef2f2;
+  --success: #059669;
+  --success-soft: #ecfdf5;
+  --warning: #b45309;
+  --warning-soft: #fffbeb;
+
+  --sidebar: #0b1220;
+  --sidebar-text: #94a3b8;
+  --sidebar-active: #1e293b;
+
+  --radius: 8px;
+  --radius-sm: 6px;
+  --shadow: 0 1px 2px rgb(15 23 42 / 6%), 0 1px 3px rgb(15 23 42 / 8%);
+  --shadow-lg: 0 20px 40px rgb(15 23 42 / 18%);
+
+  --font: "Segoe UI", system-ui, -apple-system, "Helvetica Neue", Arial, sans-serif;
+  --mono: "Cascadia Mono", Consolas, ui-monospace, monospace;
+  --fs: 13px;
+  --fs-sm: 12px;
+  --fs-xs: 11px;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #020617;
+    --surface: #0f172a;
+    --surface-muted: #111c33;
+    --border: #1e293b;
+    --text: #e2e8f0;
+    --text-soft: #cbd5e1;
+    --text-muted: #64748b;
+    --primary-soft: rgb(79 70 229 / 18%);
+    --danger-soft: rgb(220 38 38 / 15%);
+    --success-soft: rgb(5 150 105 / 15%);
+    --warning-soft: rgb(180 83 9 / 15%);
+    --sidebar: #020617;
+    --sidebar-active: #172036;
+  }
+}

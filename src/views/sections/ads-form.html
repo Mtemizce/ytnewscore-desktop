@@ -1,0 +1,84 @@
+<div class="modal-backdrop" x-show="modalOpen" x-transition.opacity @keydown.escape.window="modalOpen = false">
+  <form class="modal modal-lg" @submit.prevent="save()">
+    <div class="modal-head">
+      <h2 x-text="editingId ? 'Reklamı Düzenle' : 'Yeni Reklam'"></h2>
+      <button type="button" class="icon-btn" @click="modalOpen = false">✕</button>
+    </div>
+
+    <div class="modal-body form-grid">
+      <div class="form-main">
+        <div class="form-row">
+          <label class="field"><span>Başlık</span><input class="input" x-model="form.title" required maxlength="255"><small class="error" x-text="fieldError('title')"></small></label>
+          <label class="field"><span>Reklam veren</span><input class="input" x-model="form.advertiser_name" maxlength="255"></label>
+        </div>
+
+        <div class="field">
+          <span>Tür</span>
+          <div class="segmented">
+            <button type="button" :class="{ 'is-active': form.type === 'image' }" @click="form.type = 'image'">Görsel</button>
+            <button type="button" :class="{ 'is-active': form.type === 'html' }" @click="form.type = 'html'">HTML / Kod</button>
+          </div>
+        </div>
+
+        <template x-if="form.type === 'image'">
+          <div class="field">
+            <div class="segmented segmented-sm">
+              <button type="button" :class="{ 'is-active': form.image_source === 'upload' }" @click="form.image_source = 'upload'">Yükle</button>
+              <button type="button" :class="{ 'is-active': form.image_source === 'url' }" @click="form.image_source = 'url'">Bağlantı</button>
+            </div>
+            <div class="image-slot" x-show="imagePreview && form.image_source === 'upload'"><img :src="imagePreview" alt=""></div>
+            <input class="input input-file" type="file" accept="image/jpeg,image/png,image/webp" x-show="form.image_source === 'upload'" @change="pickImage($event)">
+            <input class="input" x-model="form.image_url" placeholder="https://…/banner.jpg" x-show="form.image_source === 'url'">
+            <small class="error" x-text="fieldError('image') || fieldError('image_url') || fieldError('media_asset_id')"></small>
+          </div>
+        </template>
+
+        <template x-if="form.type === 'html'">
+          <label class="field">
+            <span>HTML / reklam kodu</span>
+            <textarea class="input input-body" rows="10" x-model="form.html_content" maxlength="20000"></textarea>
+            <small class="error" x-text="fieldError('html_content')"></small>
+          </label>
+        </template>
+
+        <label class="field"><span>Hedef adres</span><input class="input" x-model="form.target_url" placeholder="https://reklamveren.com"><small class="error" x-text="fieldError('target_url')"></small></label>
+      </div>
+
+      <div class="form-side">
+        <label class="field" x-show="!editingId">
+          <span>Alan</span>
+          <select class="input" x-model="form.ad_zone_id" required>
+            <template x-for="z in zones" :key="z.id"><option :value="z.id" x-text="z.name + (z.width ? ' (' + z.width + '×' + z.height + ')' : '')" :selected="String(z.id) === String(form.ad_zone_id)"></option></template>
+          </select>
+          <small class="error" x-text="fieldError('ad_zone_id')"></small>
+        </label>
+
+        <div class="field">
+          <span>Durum</span>
+          <label class="toggle"><input type="checkbox" x-model="form.is_active"><span class="toggle-track"></span><span>Etkin</span></label>
+          <label class="toggle"><input type="checkbox" x-model="form.is_paid"><span class="toggle-track"></span><span>Ücretli</span></label>
+        </div>
+
+        <label class="field"><span>Başlangıç</span><input class="input" type="datetime-local" x-model="form.starts_at"></label>
+        <label class="field"><span>Bitiş</span><input class="input" type="datetime-local" x-model="form.ends_at"><small class="error" x-text="fieldError('ends_at')"></small></label>
+
+        <div class="form-row">
+          <label class="field"><span>Gösterim sınırı</span><input class="input" type="number" min="1" x-model="form.impression_limit" placeholder="Sınırsız"></label>
+          <label class="field"><span>Tıklama sınırı</span><input class="input" type="number" min="1" x-model="form.click_limit" placeholder="Sınırsız"></label>
+        </div>
+
+        <div class="field">
+          <span>Gösterileceği sayfalar</span>
+          <template x-for="p in targetPages" :key="p.key">
+            <label class="toggle"><input type="checkbox" :checked="form.target_pages.includes(p.key)" @change="toggleTarget(p.key)"><span class="toggle-track"></span><span x-text="p.label"></span></label>
+          </template>
+        </div>
+      </div>
+    </div>
+
+    <div class="modal-foot">
+      <button type="button" class="btn btn-ghost" @click="modalOpen = false">Vazgeç</button>
+      <button class="btn btn-primary" :disabled="saving" x-text="saving ? 'Kaydediliyor…' : 'Kaydet'"></button>
+    </div>
+  </form>
+</div>

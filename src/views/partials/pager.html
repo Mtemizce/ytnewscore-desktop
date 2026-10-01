@@ -1,0 +1,18 @@
+<div class="table-foot">
+  <div class="table-foot-left">
+    <span x-text="rangeText()"></span>
+    <label class="per-page">
+      Sayfada
+      <select class="input input-sm" x-model.number="perPage" @change="refilter()">
+        <option>10</option><option>25</option><option>50</option>
+      </select>
+    </label>
+  </div>
+  <div class="pager" x-show="meta.last_page > 1">
+    <button type="button" class="page-btn" :disabled="meta.current_page === 1" @click="goTo(meta.current_page - 1)">‹</button>
+    <template x-for="(p, i) in pages()" :key="i">
+      <button type="button" class="page-btn" :class="{ 'is-current': p === meta.current_page }" :disabled="p === '…'" @click="goTo(p)" x-text="p"></button>
+    </template>
+    <button type="button" class="page-btn" :disabled="meta.current_page === meta.last_page" @click="goTo(meta.current_page + 1)">›</button>
+  </div>
+</div>

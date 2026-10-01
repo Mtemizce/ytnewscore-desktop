@@ -1,0 +1,71 @@
+<section x-data="inboxSection()" class="card inbox">
+  <aside class="inbox-accounts">
+    <button type="button" class="inbox-account" :class="{ 'is-active': filters.mail_account_id === '' }" @click="selectAccount('')">
+      Tüm gelenler <span class="tab-count" x-show="meta.unread" x-text="meta.unread"></span>
+    </button>
+    <template x-for="a in meta.accounts || []" :key="a.id">
+      <button type="button" class="inbox-account" :class="{ 'is-active': filters.mail_account_id === a.id, 'is-off': !a.is_enabled }" @click="selectAccount(a.id)" :title="a.username">
+        <span x-text="a.label"></span>
+      </button>
+    </template>
+    <button type="button" class="btn btn-ghost btn-sm inbox-poll" @click="pollNow()">Şimdi Tara</button>
+  </aside>
+
+  <div class="inbox-list">
+    <div class="toolbar">
+      <input class="input toolbar-search" type="search" placeholder="Konu, gönderen ya da metin…" x-model="search" @input="refilter(true)">
+      <select class="input" x-model="filters.status" @change="refilter()">
+        <option value="">Tüm durumlar</option>
+        <option value="pending">Bekliyor</option>
+        <option value="reviewed">İncelendi</option>
+        <option value="converted">Dönüştürüldü</option>
+        <option value="rejected">Reddedildi</option>
+      </select>
+    </div>
+    <p class="alert alert-error" x-show="listError" x-text="listError"></p>
+    <div class="mail-list" :class="{ 'is-loading': loading }">
+      <template x-for="m in items" :key="m.id">
+        <button type="button" class="mail" :class="{ 'is-unread': !m.is_read, 'is-active': selected?.id === m.id }" @click="open(m)">
+          <span class="mail-from" x-text="m.from_address || '—'"></span>
+          <span class="mail-date" x-text="formatDate(m.received_at)"></span>
+          <span class="mail-subject" x-text="m.subject || '(Konusuz)'"></span>
+          <span class="mail-meta">
+            <span class="badge" :class="statusBadge(m.status)" x-text="m.status_label"></span>
+            <span class="muted" x-show="m.attachment_count" x-text="'📎 ' + m.attachment_count"></span>
+          </span>
+        </button>
+      </template>
+      <p class="empty" x-show="loaded && !items.length">Gelen kutusu boş.</p>
+    </div>
+    <!-- @include partials/pager -->
+  </div>
+
+  <div class="inbox-reader" :class="{ 'is-loading': loadingItem }">
+    <template x-if="!selected">
+      <p class="empty">Okumak için soldan bir e-posta seçin.</p>
+    </template>
+    <template x-if="selected">
+      <div class="reader">
+        <div class="reader-actions">
+          <button type="button" class="btn btn-ghost btn-sm" x-show="selected.status !== 'reviewed'" @click="act('reviewed')">İncelendi</button>
+          <button type="button" class="btn btn-ghost btn-sm" @click="act('unread')">Okunmadı yap</button>
+          <button type="button" class="btn btn-ghost btn-sm" x-show="selected.status !== 'rejected'" @click="act('reject')">Reddet</button>
+          <button type="button" class="btn btn-ghost-danger btn-sm" @click="remove()">Sil</button>
+          <button type="button" class="btn btn-primary btn-sm" @click="openInPanel()">Panelde aç</button>
+        </div>
+        <h2 class="reader-subject" x-text="selected.subject || '(Konusuz)'"></h2>
+        <div class="reader-from">
+          <span x-text="selected.from_address"></span>
+          <span class="muted" x-text="formatDate(selected.received_at)"></span>
+        </div>
+        <div class="reader-attachments" x-show="selected.attachments.length">
+          <template x-for="(f, i) in selected.attachments" :key="i">
+            <span class="attachment" x-text="'📎 ' + f.filename + ' · ' + formatSize(f.size)"></span>
+          </template>
+          <span class="muted">Ekleri indirmek ve habere dönüştürmek için "Panelde aç".</span>
+        </div>
+        <div class="reader-body" x-text="selected.body || '(Metin yok)'"></div>
+      </div>
+    </template>
+  </div>
+</section>

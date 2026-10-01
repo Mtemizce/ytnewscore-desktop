@@ -1,0 +1,9 @@
+/* Stil girişi: sıra önemli (belirteçler → temel → yerleşim → parçalar). */
+@import "./tokens.css";
+@import "./base.css";
+@import "./layout.css";
+@import "./components.css";
+@import "./table.css";
+@import "./form.css";
+@import "./inbox.css";
+@import "./dashboard.css";

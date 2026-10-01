@@ -1,0 +1,90 @@
+<section x-data="commentsSection()" class="card">
+  <div class="tabs">
+    <template x-for="t in tabs" :key="t.key">
+      <button type="button" class="tab" :class="{ 'is-active': filters.status === t.key }" @click="setTab(t.key)">
+        <span x-text="t.label"></span>
+        <span class="tab-count" x-text="count(t.key)"></span>
+      </button>
+    </template>
+  </div>
+
+  <div class="toolbar">
+    <input class="input toolbar-search" type="search" placeholder="Yorum, ad, e-posta, IP ya da içerik…" x-model="search" @input="refilter(true)">
+    <div class="toolbar-spacer"></div>
+    <button type="button" class="icon-btn" title="Yenile" @click="reload()" :class="{ 'is-spinning': loading }">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" d="M16.023 9.348h4.992V4.356M2.985 19.644v-4.992h4.992m0 0 3.181 3.183a8.25 8.25 0 0 0 13.803-3.7M4.031 9.865a8.25 8.25 0 0 1 13.803-3.7l3.181 3.182"/></svg>
+    </button>
+  </div>
+
+  <p class="alert alert-error" x-show="listError" x-text="listError"></p>
+
+  <div class="table-wrap" :class="{ 'is-loading': loading }">
+    <table class="table">
+      <thead>
+        <tr>
+          <th>Yorum</th>
+          <th>Yazan</th>
+          <th>İçerik</th>
+          <th>Durum</th>
+          <th>Tarih</th>
+          <th class="col-actions">İşlemler</th>
+        </tr>
+      </thead>
+      <tbody>
+        <template x-for="c in items" :key="c.id">
+          <tr>
+            <td class="col-comment">
+              <div class="reply-to" x-show="c.parent" x-text="c.parent ? '↳ ' + c.parent.author_name + ': ' + c.parent.body : ''"></div>
+              <div class="comment-body" :class="{ 'is-open': expanded[c.id] }" x-text="c.body" @click="expanded[c.id] = !expanded[c.id]"></div>
+              <div class="muted" x-text="'👍 ' + c.likes + '  👎 ' + c.dislikes + '  · ' + c.reply_count + ' yanıt'"></div>
+            </td>
+            <td>
+              <div class="cell-strong" x-text="c.author_name"></div>
+              <div class="muted" x-text="c.author_email || ''"></div>
+              <div class="muted mono" x-text="c.author_ip || ''"></div>
+            </td>
+            <td>
+              <div x-text="c.commentable_title || '—'"></div>
+              <button type="button" class="link" x-show="c.commentable_url" @click="copy(c.commentable_url)">Adresi kopyala</button>
+            </td>
+            <td><span class="badge" :class="statusBadge(c.status)" x-text="c.status_label"></span></td>
+            <td class="nowrap" x-text="formatDate(c.created_at)"></td>
+            <td class="col-actions">
+              <div class="action-row" :class="{ 'is-busy': busyId === c.id }">
+                <button type="button" class="btn btn-ghost btn-sm" x-show="c.status !== 'approved'" @click="moderate(c, 'approved')">Onayla</button>
+                <button type="button" class="btn btn-ghost btn-sm" x-show="c.status !== 'rejected'" @click="moderate(c, 'rejected')">Reddet</button>
+                <button type="button" class="btn btn-ghost btn-sm" x-show="c.status !== 'spam'" @click="moderate(c, 'spam')">Spam</button>
+                <button type="button" class="btn btn-ghost-danger btn-sm" x-show="$store.auth.can('comments.bans.create')" @click="openBan(c)">Yasakla</button>
+                <button type="button" class="btn btn-ghost-danger btn-sm" x-show="$store.auth.can('comments.delete')" @click="remove(c)">Sil</button>
+              </div>
+            </td>
+          </tr>
+        </template>
+        <tr x-show="loaded && !items.length">
+          <td colspan="6" class="empty">Bu durumda yorum yok.</td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+
+  <!-- @include partials/pager -->
+
+  <div class="modal-backdrop" x-show="banTarget" x-transition.opacity @keydown.escape.window="banTarget = null">
+    <form class="modal modal-sm" @submit.prevent="confirmBan()">
+      <div class="modal-head">
+        <h2 x-text="'Yasakla: ' + (banTarget?.author_name || '')"></h2>
+        <button type="button" class="icon-btn" @click="banTarget = null">✕</button>
+      </div>
+      <div class="modal-body">
+        <label class="toggle"><input type="checkbox" x-model="ban.ban_ip" :disabled="!banTarget?.author_ip"><span class="toggle-track"></span><span x-text="'IP adresi ' + (banTarget?.author_ip || '(yok)')"></span></label>
+        <label class="toggle"><input type="checkbox" x-model="ban.ban_email" :disabled="!banTarget?.author_email"><span class="toggle-track"></span><span x-text="'E-posta ' + (banTarget?.author_email || '(yok)')"></span></label>
+        <label class="field"><span>Neden <small class="muted">(isteğe bağlı)</small></span><input class="input" x-model="ban.reason" maxlength="1000"></label>
+        <p class="hint">Bu kişinin bekleyen diğer yorumları da reddedilir.</p>
+      </div>
+      <div class="modal-foot">
+        <button type="button" class="btn btn-ghost" @click="banTarget = null">Vazgeç</button>
+        <button class="btn btn-danger" :disabled="banning || (!ban.ban_ip && !ban.ban_email)">Yasakla</button>
+      </div>
+    </form>
+  </div>
+</section>

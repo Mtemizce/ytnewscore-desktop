@@ -1,0 +1,12 @@
+<div x-data="appShell" class="app">
+  <template x-if="!authenticated">
+    <div><!-- @include login --></div>
+  </template>
+  <template x-if="authenticated">
+    <div x-show="!locked"><!-- @include shell --></div>
+  </template>
+  <!-- @include partials/lock -->
+  <!-- @include partials/force-password -->
+  <!-- @include partials/confirm -->
+  <!-- @include partials/toast -->
+</div>

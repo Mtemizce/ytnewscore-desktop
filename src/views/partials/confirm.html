@@ -1,0 +1,11 @@
+<div class="modal-backdrop" x-show="$store.ui.confirmBox.open" x-transition.opacity @keydown.escape.window="$store.ui.answer(false)">
+  <div class="modal modal-sm" @click.outside="$store.ui.answer(false)">
+    <div class="modal-body">
+      <p x-text="$store.ui.confirmBox.message"></p>
+    </div>
+    <div class="modal-foot">
+      <button type="button" class="btn btn-ghost" @click="$store.ui.answer(false)">Vazgeç</button>
+      <button type="button" class="btn btn-danger" @click="$store.ui.answer(true)">Onayla</button>
+    </div>
+  </div>
+</div>

@@ -1,0 +1,65 @@
+<section x-data="formsSection()" class="card inbox">
+  <aside class="inbox-accounts">
+    <template x-for="f in forms" :key="f.id">
+      <button type="button" class="inbox-account" :class="{ 'is-active': formId === f.id }" @click="selectForm(f.id)">
+        <span x-text="f.name"></span>
+        <span class="tab-count" x-show="f.unread" x-text="f.unread"></span>
+      </button>
+    </template>
+    <p class="empty" x-show="!forms.length">Form yok.</p>
+    <button type="button" class="btn btn-ghost btn-sm inbox-poll" x-show="formId && $store.auth.can('forms.update')" @click="editForm()">Formu düzenle</button>
+  </aside>
+
+  <div class="inbox-list">
+    <p class="alert alert-error" x-show="listError" x-text="listError"></p>
+    <div class="mail-list" :class="{ 'is-loading': loading }">
+      <template x-for="s in items" :key="s.id">
+        <button type="button" class="mail" :class="{ 'is-unread': !s.is_read, 'is-active': selected?.id === s.id }" @click="open(s)">
+          <span class="mail-from" x-text="'#' + s.id"></span>
+          <span class="mail-date" x-text="formatDate(s.created_at)"></span>
+          <span class="mail-subject" x-text="s.preview || '(boş)'"></span>
+        </button>
+      </template>
+      <p class="empty" x-show="loaded && !items.length">Bu forma henüz gönderi yok.</p>
+    </div>
+    <!-- @include partials/pager -->
+  </div>
+
+  <div class="inbox-reader" :class="{ 'is-loading': loadingItem }">
+    <template x-if="!selected">
+      <p class="empty">Okumak için bir gönderi seçin.</p>
+    </template>
+    <template x-if="selected">
+      <div class="reader">
+        <div class="reader-actions">
+          <button type="button" class="btn btn-ghost btn-sm" @click="markUnread()">Okunmadı yap</button>
+          <button type="button" class="btn btn-ghost-danger btn-sm" @click="remove()">Sil</button>
+        </div>
+        <h2 class="reader-subject" x-text="(currentForm?.name || '') + ' · #' + selected.id"></h2>
+        <div class="reader-from"><span class="muted" x-text="formatDate(selected.created_at)"></span></div>
+        <dl class="answers">
+          <template x-for="f in selected.fields" :key="f.key">
+            <div class="answer">
+              <dt x-text="f.label"></dt>
+              <dd>
+                <template x-if="f.files">
+                  <div class="answer-files">
+                    <template x-for="file in f.files" :key="file.url">
+                      <div>
+                        <span class="badge badge-red" x-show="file.risky">Riskli dosya</span>
+                        <code x-text="file.url"></code>
+                        <button type="button" class="link" @click="copy(file.url)">Kopyala</button>
+                      </div>
+                    </template>
+                    <span class="muted" x-show="!f.files.length">—</span>
+                  </div>
+                </template>
+                <template x-if="!f.files"><span class="answer-text" x-text="display(f.value)"></span></template>
+              </dd>
+            </div>
+          </template>
+        </dl>
+      </div>
+    </template>
+  </div>
+</section>

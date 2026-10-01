@@ -1,0 +1,32 @@
+/* Sıfırlama ve temel tipografi. */
+*, *::before, *::after { box-sizing: border-box; }
+
+html, body { margin: 0; height: 100%; }
+
+body {
+  font: var(--fs)/1.5 var(--font);
+  color: var(--text);
+  background: var(--bg);
+  -webkit-font-smoothing: antialiased;
+}
+
+[x-cloak] { display: none !important; }
+
+h1, h2, p { margin: 0; }
+
+button { font: inherit; color: inherit; cursor: pointer; }
+button:disabled { cursor: default; opacity: .55; }
+
+img { display: block; max-width: 100%; }
+
+svg { width: 18px; height: 18px; flex: none; }
+
+.muted { color: var(--text-muted); font-size: var(--fs-xs); font-weight: 400; }
+.nowrap { white-space: nowrap; }
+.empty { padding: 28px 12px; text-align: center; color: var(--text-muted); }
+
+.link { border: 0; background: none; padding: 0; color: var(--primary); font-size: var(--fs-xs); }
+.link:hover { text-decoration: underline; }
+
+::-webkit-scrollbar { width: 10px; height: 10px; }
+::-webkit-scrollbar-thumb { background: var(--border); border-radius: 10px; border: 2px solid var(--bg); }

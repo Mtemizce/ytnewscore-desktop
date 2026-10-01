@@ -1,0 +1,50 @@
+/* Pano, sunucu durumu, kilit ekranı sayıları ve masaüstü widget'ı. */
+.dashboard { display: grid; gap: 16px; }
+.dash-head { display: flex; align-items: center; gap: 8px; }
+
+.stat-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); gap: 12px; }
+.stat-card { display: grid; gap: 2px; padding: 14px 16px; background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); box-shadow: var(--shadow); }
+.stat-card.is-alert { border-color: var(--warning); box-shadow: inset 3px 0 0 var(--warning); }
+.stat-label { color: var(--text-muted); font-size: var(--fs-xs); font-weight: 600; text-transform: uppercase; letter-spacing: .03em; }
+.stat-value { color: var(--text); font-size: 24px; font-weight: 600; font-variant-numeric: tabular-nums; }
+
+.service-list { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 8px; }
+.service { display: flex; align-items: center; gap: 8px; padding: 8px 10px; border: 1px solid var(--border); border-radius: var(--radius-sm); }
+.service .muted { margin-left: auto; }
+.dot { display: inline-block; width: 9px; height: 9px; border-radius: 50%; flex: none; }
+.dot-on { background: #10b981; box-shadow: 0 0 0 3px rgb(16 185 129 / 20%); }
+.dot-off { background: var(--danger); box-shadow: 0 0 0 3px rgb(220 38 38 / 20%); }
+
+.server-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 12px 16px; }
+.server-grid > div { display: grid; gap: 3px; font-size: var(--fs-sm); }
+.meter { height: 6px; border-radius: 3px; background: var(--surface-muted); border: 1px solid var(--border); overflow: hidden; }
+.meter span { display: block; height: 100%; background: var(--primary); }
+.meter span.is-high { background: var(--danger); }
+.text-danger { color: var(--danger); font-weight: 600; }
+
+/* Kilit ekranı sayıları */
+.lock { grid-template-rows: 1fr auto; }
+.lock-stats { display: flex; flex-wrap: wrap; justify-content: center; gap: 10px; padding: 0 24px 32px; }
+.lock-stat { display: flex; align-items: baseline; gap: 6px; padding: 8px 14px; border-radius: 999px; background: rgb(255 255 255 / 8%); color: #cbd5e1; font-size: var(--fs-sm); }
+.lock-stat b { color: #fff; font-size: 16px; }
+.lock-stat.is-alert b { color: #fbbf24; }
+
+/* Masaüstü widget penceresi */
+html.is-widget, html.is-widget body { background: #0b1220; overflow: hidden; }
+.widget { display: flex; flex-direction: column; height: 100vh; background: #0b1220; color: #e2e8f0; border: 1px solid rgb(255 255 255 / 10%); overflow: hidden; }
+.widget-head { display: flex; align-items: center; gap: 8px; padding: 10px 12px; border-bottom: 1px solid rgb(255 255 255 / 8%); cursor: move; user-select: none; }
+.widget-head .brand-mark { width: 22px; height: 22px; font-size: 10px; }
+.widget-title { flex: 1; font-weight: 600; font-size: var(--fs-sm); }
+.widget-btn { width: 22px; height: 22px; border: 0; border-radius: 6px; background: none; color: #94a3b8; font-size: 12px; }
+.widget-btn:hover { background: rgb(255 255 255 / 10%); color: #fff; }
+.widget-body { flex: 1; display: grid; align-content: start; gap: 2px; padding: 10px 12px; overflow: auto; }
+.widget-live { display: grid; justify-items: center; padding: 6px 0 12px; }
+.widget-live-value { font-size: 34px; font-weight: 700; color: #fff; font-variant-numeric: tabular-nums; }
+.widget-live-label { color: #94a3b8; font-size: var(--fs-xs); text-transform: uppercase; letter-spacing: .05em; }
+.widget-row { display: flex; justify-content: space-between; padding: 6px 2px; border-bottom: 1px solid rgb(255 255 255 / 6%); font-size: var(--fs-sm); color: #cbd5e1; }
+.widget-row b { color: #fff; font-variant-numeric: tabular-nums; }
+.widget-row.is-alert b { color: #fbbf24; }
+.widget-services { display: flex; flex-wrap: wrap; gap: 6px 12px; padding-top: 10px; font-size: var(--fs-xs); color: #94a3b8; }
+.widget-service { display: inline-flex; align-items: center; gap: 5px; }
+.widget-empty, .widget-error { padding: 16px; color: #94a3b8; font-size: var(--fs-sm); text-align: center; }
+.widget-error { color: #fca5a5; padding: 6px 0 0; }

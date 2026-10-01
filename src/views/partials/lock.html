@@ -1,0 +1,18 @@
+<div class="lock" x-show="authenticated && locked" x-transition.opacity>
+  <form class="lock-card" @submit.prevent="unlock()">
+    <img class="avatar avatar-xl" x-show="user?.avatar_url" :src="user?.avatar_url" alt="">
+    <span class="avatar avatar-xl" x-show="!user?.avatar_url" x-text="initials(user?.name)"></span>
+    <div class="lock-name" x-text="user?.name"></div>
+    <input class="input lock-input" type="password" data-unlock-input x-model="unlockPassword" placeholder="Parola" autocomplete="current-password" required>
+    <p class="lock-error" x-show="unlockError" x-text="unlockError"></p>
+    <button class="btn btn-primary btn-block" :disabled="unlocking" x-text="unlocking ? 'Açılıyor…' : 'Kilidi Aç'"></button>
+    <button type="button" class="link lock-link" @click="logout()">Farklı hesapla giriş yap</button>
+  </form>
+  <div class="lock-stats">
+    <div class="lock-stat"><b x-text="$store.stats.value('live_visitors')"></b><span>anlık ziyaretçi</span></div>
+    <div class="lock-stat"><b x-text="$store.stats.value('news_today')"></b><span>bugün haber</span></div>
+    <div class="lock-stat" :class="{ 'is-alert': $store.stats.counts.comments_pending > 0 }"><b x-text="$store.stats.value('comments_pending')"></b><span>bekleyen yorum</span></div>
+    <div class="lock-stat" :class="{ 'is-alert': $store.stats.counts.inbox_unread > 0 }"><b x-text="$store.stats.value('inbox_unread')"></b><span>okunmamış e-posta</span></div>
+    <div class="lock-stat"><span class="dot" :class="$store.stats.allServicesUp ? 'dot-on' : 'dot-off'"></span><span x-text="$store.stats.allServicesUp ? 'Sunucu çalışıyor' : 'Sunucuda sorun'"></span></div>
+  </div>
+</div>

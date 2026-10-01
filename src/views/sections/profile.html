@@ -1,0 +1,90 @@
+<div x-data="profileSection()" class="profile-grid">
+  <section class="card">
+    <div class="card-head">Kişisel Bilgiler</div>
+    <form class="card-body" @submit.prevent="save()">
+      <div class="avatar-edit">
+        <img class="avatar avatar-lg" x-show="user?.avatar_url" :src="user?.avatar_url" alt="">
+        <span class="avatar avatar-lg" x-show="!user?.avatar_url" x-text="initials(user?.name)"></span>
+        <div>
+          <label class="btn btn-ghost btn-sm" :class="{ 'is-busy': avatarUploading }">
+            <span x-text="avatarUploading ? 'Yükleniyor…' : 'Profil resmini değiştir'"></span>
+            <input type="file" hidden accept="image/jpeg,image/png,image/webp" @change="uploadAvatar($event)">
+          </label>
+          <p class="hint">jpg, png, webp; en fazla 2 MB.</p>
+        </div>
+      </div>
+      <div class="form-row">
+        <label class="field"><span>Ad Soyad</span><input class="input" x-model="form.name" required><small class="error" x-text="fieldError(formErrors, 'name')"></small></label>
+        <label class="field"><span>Kullanıcı adı</span><input class="input" x-model="form.username"><small class="error" x-text="fieldError(formErrors, 'username')"></small></label>
+      </div>
+      <div class="form-row">
+        <label class="field"><span>E-posta</span><input class="input" type="email" x-model="form.email" required><small class="error" x-text="fieldError(formErrors, 'email')"></small></label>
+        <label class="field"><span>Telefon</span><input class="input" x-model="form.phone"><small class="error" x-text="fieldError(formErrors, 'phone')"></small></label>
+      </div>
+      <label class="field"><span>Telegram ID</span><input class="input" x-model="form.telegram_id"><small class="error" x-text="fieldError(formErrors, 'telegram_id')"></small></label>
+      <div class="card-actions">
+        <span class="muted" x-show="user?.roles?.length" x-text="'Rol: ' + (user?.roles || []).join(', ')"></span>
+        <button class="btn btn-primary" :disabled="saving" x-text="saving ? 'Kaydediliyor…' : 'Kaydet'"></button>
+      </div>
+    </form>
+  </section>
+
+  <div class="stack">
+    <section class="card">
+      <div class="card-head">Parola</div>
+      <form class="card-body" @submit.prevent="changePassword()">
+        <label class="field"><span>Mevcut parola</span><input class="input" type="password" x-model="password.current_password" autocomplete="current-password" required><small class="error" x-text="fieldError(passwordErrors, 'current_password')"></small></label>
+        <label class="field"><span>Yeni parola <small class="muted">(en az 8 karakter)</small></span><input class="input" type="password" x-model="password.password" autocomplete="new-password" required><small class="error" x-text="fieldError(passwordErrors, 'password')"></small></label>
+        <label class="field"><span>Yeni parola (tekrar)</span><input class="input" type="password" x-model="password.password_confirmation" autocomplete="new-password" required></label>
+        <div class="card-actions"><button class="btn btn-primary" :disabled="passwordSaving">Parolayı Değiştir</button></div>
+      </form>
+    </section>
+
+    <section class="card">
+      <div class="card-head">
+        İki Adımlı Doğrulama
+        <span class="badge" :class="user?.two_factor_enabled ? 'badge-green' : 'badge-slate'" x-text="user?.two_factor_enabled ? 'Açık' : 'Kapalı'"></span>
+      </div>
+      <div class="card-body">
+        <p class="alert alert-error" x-show="twoFactorError" x-text="twoFactorError"></p>
+
+        <template x-if="recoveryCodes.length">
+          <div class="field">
+            <span>Kurtarma kodları <small class="muted">(bir kez gösterilir; güvenli bir yere kaydedin)</small></span>
+            <div class="codes"><template x-for="c in recoveryCodes" :key="c"><code x-text="c"></code></template></div>
+            <button type="button" class="btn btn-ghost btn-sm" @click="copyRecoveryCodes()">Kopyala</button>
+          </div>
+        </template>
+
+        <template x-if="!user?.two_factor_enabled && !twoFactorSetup">
+          <div class="field">
+            <p class="hint">Girişte parolanın yanında doğrulama uygulamasındaki (Google Authenticator, Microsoft Authenticator…) 6 haneli kod istenir.</p>
+            <div><button type="button" class="btn btn-primary" :disabled="twoFactorBusy" @click="startTwoFactor()">Etkinleştir</button></div>
+          </div>
+        </template>
+
+        <template x-if="twoFactorSetup">
+          <form class="field" @submit.prevent="confirmTwoFactor()">
+            <span>1. QR kodunu doğrulama uygulamasıyla okutun</span>
+            <img class="qr" :src="twoFactorSetup.qr_code" alt="QR kodu">
+            <small class="muted">Okutamıyorsanız anahtar: <code x-text="twoFactorSetup.secret"></code></small>
+            <span>2. Uygulamadaki 6 haneli kodu girin</span>
+            <input class="input input-code" x-model="twoFactorCode" inputmode="numeric" maxlength="6" placeholder="000000" required>
+            <div class="card-actions">
+              <button type="button" class="btn btn-ghost" @click="twoFactorSetup = null">Vazgeç</button>
+              <button class="btn btn-primary" :disabled="twoFactorBusy">Doğrula ve Aç</button>
+            </div>
+          </form>
+        </template>
+
+        <template x-if="user?.two_factor_enabled">
+          <form class="field" @submit.prevent="disableTwoFactor()">
+            <span>Kapatmak için parolanız</span>
+            <input class="input" type="password" x-model="disablePassword" autocomplete="current-password" required>
+            <div class="card-actions"><button class="btn btn-ghost-danger" :disabled="twoFactorBusy">Kapat</button></div>
+          </form>
+        </template>
+      </div>
+    </section>
+  </div>
+</div>

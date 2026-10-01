@@ -1,0 +1,47 @@
+{
+  "$schema": "../gen/schemas/desktop-schema.json",
+  "identifier": "default",
+  "description": "Uygulama penceresi ve masaüstü widget penceresi (panel pencereleri hariç: uzak sayfaya IPC verilmez)",
+  "windows": [
+    "main",
+    "widget"
+  ],
+  "permissions": [
+    "core:default",
+    "core:window:allow-start-dragging",
+    "core:webview:allow-create-webview-window",
+    "core:window:allow-is-fullscreen",
+    "core:window:allow-set-fullscreen",
+    "notification:default",
+    "os:default",
+    {
+      "identifier": "http:default",
+      "allow": [
+        {
+          "url": "http://localhost:*"
+        },
+        {
+          "url": "http://127.0.0.1:*"
+        },
+        {
+          "url": "http://*.local"
+        },
+        {
+          "url": "http://*.local:*"
+        },
+        {
+          "url": "http://*.test"
+        },
+        {
+          "url": "http://*.test:*"
+        },
+        {
+          "url": "https://*"
+        },
+        {
+          "url": "https://*:*"
+        }
+      ]
+    }
+  ]
+}

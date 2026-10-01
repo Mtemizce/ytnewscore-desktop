@@ -1,0 +1,34 @@
+<div x-data="widget" class="widget">
+  <div class="widget-head" data-tauri-drag-region>
+    <span class="brand-mark" data-tauri-drag-region>YT</span>
+    <span class="widget-title" data-tauri-drag-region>YTNewsCore</span>
+    <span class="dot" :class="$store.stats.allServicesUp ? 'dot-on' : 'dot-off'" :title="$store.stats.allServicesUp ? 'Servisler çalışıyor' : 'Servis sorunu'"></span>
+    <button type="button" class="widget-btn" title="Uygulamayı aç" @click="openApp()">⤢</button>
+    <button type="button" class="widget-btn" title="Kapat" @click="close()">✕</button>
+  </div>
+
+  <template x-if="!signedIn">
+    <p class="widget-empty">Görmek için uygulamada giriş yapın.</p>
+  </template>
+
+  <template x-if="signedIn">
+    <div class="widget-body">
+      <div class="widget-live">
+        <span class="widget-live-value" x-text="$store.stats.value('live_visitors')"></span>
+        <span class="widget-live-label">anlık ziyaretçi</span>
+      </div>
+      <template x-for="c in cards" :key="c.key">
+        <div class="widget-row" :class="{ 'is-alert': c.alert && Number($store.stats.counts[c.key]) > 0 }">
+          <span x-text="c.label"></span>
+          <b x-text="$store.stats.value(c.key)"></b>
+        </div>
+      </template>
+      <div class="widget-services">
+        <template x-for="s in services" :key="s.key">
+          <span class="widget-service"><span class="dot" :class="$store.stats.services[s.key] ? 'dot-on' : 'dot-off'"></span><span x-text="s.label"></span></span>
+        </template>
+      </div>
+      <p class="widget-error" x-show="$store.stats.error" x-text="$store.stats.error"></p>
+    </div>
+  </template>
+</div>

@@ -1,0 +1,48 @@
+<div class="login">
+  <form class="login-card" @submit.prevent="doLogin" x-show="!twoFactor.challenge">
+    <div class="brand brand-dark">
+      <span class="brand-mark">YT</span>
+      <span>YTNews<b>Core</b> <small>Masaüstü</small></span>
+    </div>
+
+    <label class="field">
+      <span>Sunucu adresi</span>
+      <input class="input" x-model="login.baseUrl" placeholder="https://site.com" required>
+    </label>
+    <p class="hint hint-warn" x-show="insecureUrl">
+      Bu adres HTTPS değil: şifre şifrelenmeden gider. Canlı sitede https:// kullanın.
+    </p>
+
+    <label class="field">
+      <span>E-posta ya da kullanıcı adı</span>
+      <input class="input" x-model="login.login" autocomplete="username" required>
+    </label>
+
+    <label class="field">
+      <span>Şifre</span>
+      <input class="input" type="password" x-model="login.password" autocomplete="current-password" required>
+    </label>
+
+    <p class="alert alert-error" x-show="loginError" x-text="loginError"></p>
+
+    <button class="btn btn-primary btn-block" :disabled="loggingIn">
+      <span x-text="loggingIn ? 'Giriş yapılıyor…' : 'Giriş Yap'"></span>
+    </button>
+    <p class="hint">Cihaz adı otomatik gönderilir; bağlantıyı panelde Ayarlar › API › Bağlı Hesaplar'dan kesebilirsiniz.</p>
+  </form>
+
+  <form class="login-card" @submit.prevent="doTwoFactor" x-show="twoFactor.challenge">
+    <div class="brand brand-dark">
+      <span class="brand-mark">YT</span>
+      <span>İki Adımlı Doğrulama</span>
+    </div>
+    <p class="hint">Doğrulama uygulamanızdaki 6 haneli kodu ya da bir kurtarma kodunu girin.</p>
+    <label class="field">
+      <span>Kod</span>
+      <input class="input input-code" x-model="twoFactor.code" inputmode="numeric" autocomplete="one-time-code" maxlength="32" required>
+    </label>
+    <p class="alert alert-error" x-show="loginError" x-text="loginError"></p>
+    <button class="btn btn-primary btn-block" :disabled="loggingIn" x-text="loggingIn ? 'Doğrulanıyor…' : 'Doğrula'"></button>
+    <button type="button" class="link" @click="cancelTwoFactor()">‹ Girişe dön</button>
+  </form>
+</div>

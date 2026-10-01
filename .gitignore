@@ -1,0 +1,16 @@
+# Bağımlılıklar ve derleme çıktıları
+node_modules/
+dist/
+src-tauri/target/
+# Tauri'nin derlemede ürettiği şemalar
+src-tauri/gen/
+
+# Editör / işletim sistemi
+.vscode/*
+!.vscode/extensions.json
+.idea/
+.DS_Store
+Thumbs.db
+*.log
+.env
+.env.*

@@ -1,0 +1,54 @@
+<section x-data="pagesSection()" class="card">
+  <div class="toolbar">
+    <input class="input toolbar-search" type="search" placeholder="Başlık ya da adres…" x-model="search" @input="refilter(true)">
+    <select class="input" x-model="filters.status" @change="refilter()">
+      <option value="">Tüm durumlar</option>
+      <option value="published">Yayında</option>
+      <option value="draft">Taslak</option>
+    </select>
+    <div class="toolbar-spacer"></div>
+    <button type="button" class="icon-btn" title="Yenile" @click="reload()" :class="{ 'is-spinning': loading }">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" d="M16.023 9.348h4.992V4.356M2.985 19.644v-4.992h4.992m0 0 3.181 3.183a8.25 8.25 0 0 0 13.803-3.7M4.031 9.865a8.25 8.25 0 0 1 13.803-3.7l3.181 3.182"/></svg>
+    </button>
+    <button type="button" class="btn btn-primary" x-show="$store.auth.can('pages.create')" @click="openPanel('/admin/pages/create', 'Yeni Sayfa')">+ Yeni Sayfa</button>
+  </div>
+
+  <p class="alert alert-error" x-show="listError" x-text="listError"></p>
+
+  <div class="table-wrap" :class="{ 'is-loading': loading }">
+    <table class="table">
+      <thead>
+        <tr>
+          <th>Başlık</th>
+          <th>Adres</th>
+          <th>Durum</th>
+          <th>Güncellenme</th>
+          <th class="col-actions">İşlemler</th>
+        </tr>
+      </thead>
+      <tbody>
+        <template x-for="p in items" :key="p.id">
+          <tr>
+            <td>
+              <button type="button" class="cell-title" @click="$store.auth.can('pages.update') && openPanel('/admin/pages/' + p.id + '/edit', p.title)" x-text="p.title"></button>
+              <span class="badge badge-slate" x-show="p.is_protected">Sistem</span>
+            </td>
+            <td class="mono muted" x-text="'/' + p.slug"></td>
+            <td><span class="badge" :class="p.status === 'published' ? 'badge-green' : 'badge-slate'" x-text="p.status_label"></span></td>
+            <td class="nowrap" x-text="formatDate(p.updated_at)"></td>
+            <td class="col-actions">
+              <div class="action-row">
+                <button type="button" class="btn btn-ghost btn-sm" x-show="$store.auth.can('pages.update')" @click="openPanel('/admin/pages/' + p.id + '/edit', p.title)">Düzenle</button>
+                <button type="button" class="btn btn-ghost btn-sm" x-show="$store.auth.can('pages.publish')" @click="toggle(p)" x-text="p.status === 'published' ? 'Yayından kaldır' : 'Yayınla'"></button>
+                <button type="button" class="btn btn-ghost-danger btn-sm" x-show="$store.auth.can('pages.delete') && !p.is_protected" @click="remove(p)">Sil</button>
+              </div>
+            </td>
+          </tr>
+        </template>
+        <tr x-show="loaded && !items.length"><td colspan="5" class="empty">Sayfa yok.</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <!-- @include partials/pager -->
+</section>

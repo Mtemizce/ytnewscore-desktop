@@ -1,0 +1,101 @@
+<section x-data="usersSection()" class="card">
+  <div class="toolbar">
+    <input class="input toolbar-search" type="search" placeholder="Ad, kullanıcı adı ya da e-posta…" x-model="search" @input="refilter(true)">
+    <div class="toolbar-spacer"></div>
+    <button type="button" class="icon-btn" title="Yenile" @click="reload()" :class="{ 'is-spinning': loading }">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" d="M16.023 9.348h4.992V4.356M2.985 19.644v-4.992h4.992m0 0 3.181 3.183a8.25 8.25 0 0 0 13.803-3.7M4.031 9.865a8.25 8.25 0 0 1 13.803-3.7l3.181 3.182"/></svg>
+    </button>
+    <button type="button" class="btn btn-primary" x-show="$store.auth.can('settings.users.manage')" @click="openCreate()">+ Yeni Kullanıcı</button>
+  </div>
+
+  <p class="alert alert-error" x-show="listError" x-text="listError"></p>
+
+  <div class="table-wrap" :class="{ 'is-loading': loading }">
+    <table class="table">
+      <thead>
+        <tr>
+          <th>Kullanıcı</th>
+          <th>E-posta</th>
+          <th>Telefon</th>
+          <th>Durum</th>
+          <th>Kayıt</th>
+          <th class="col-actions">İşlemler</th>
+        </tr>
+      </thead>
+      <tbody>
+        <template x-for="u in items" :key="u.id">
+          <tr>
+            <td>
+              <div class="user-cell">
+                <img class="avatar" x-show="u.avatar_url" :src="u.avatar_url" alt="">
+                <span class="avatar" x-show="!u.avatar_url" x-text="initials(u.name)"></span>
+                <div>
+                  <button type="button" class="cell-title" @click="$store.auth.can('settings.users.manage') && openEdit(u)" x-text="u.name"></button>
+                  <div class="muted" x-show="u.username" x-text="'@' + u.username"></div>
+                </div>
+              </div>
+            </td>
+            <td x-text="u.email"></td>
+            <td x-text="u.phone || '—'"></td>
+            <td><span class="badge" :class="u.deactivated ? 'badge-slate' : 'badge-green'" x-text="u.deactivated ? 'Pasif' : 'Aktif'"></span></td>
+            <td class="nowrap" x-text="formatDate(u.created_at)"></td>
+            <td class="col-actions">
+              <template x-if="$store.auth.can('settings.users.manage')"><span>
+              <button type="button" class="btn btn-ghost btn-sm" @click="openEdit(u)">Düzenle</button>
+              <button type="button" class="btn btn-sm" :class="u.deactivated ? 'btn-ghost' : 'btn-ghost-danger'" @click="toggleActive(u)" x-text="u.deactivated ? 'Etkinleştir' : 'Pasifleştir'"></button>
+              </span></template>
+            </td>
+          </tr>
+        </template>
+        <tr x-show="loaded && !items.length">
+          <td colspan="6" class="empty">Kayıt bulunamadı.</td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+
+  <!-- @include partials/pager -->
+
+  <div class="modal-backdrop" x-show="modalOpen" x-transition.opacity @keydown.escape.window="modalOpen = false">
+    <form class="modal" @submit.prevent="save()">
+      <div class="modal-head">
+        <h2 x-text="editingId ? 'Kullanıcıyı Düzenle' : 'Yeni Kullanıcı'"></h2>
+        <button type="button" class="icon-btn" @click="modalOpen = false">✕</button>
+      </div>
+      <div class="modal-body">
+        <div class="avatar-edit">
+          <img class="avatar avatar-lg" x-show="avatarPreview" :src="avatarPreview" alt="">
+          <span class="avatar avatar-lg" x-show="!avatarPreview" x-text="initials(form.name)"></span>
+          <label class="btn btn-ghost btn-sm">
+            Profil resmi seç
+            <input type="file" hidden accept="image/jpeg,image/png,image/webp" @change="pickAvatar($event)">
+          </label>
+        </div>
+        <div class="form-row">
+          <label class="field"><span>Ad Soyad</span><input class="input" x-model="form.name" required><small class="error" x-text="fieldError('name')"></small></label>
+          <label class="field"><span>Kullanıcı adı</span><input class="input" x-model="form.username"><small class="error" x-text="fieldError('username')"></small></label>
+        </div>
+        <div class="form-row">
+          <label class="field"><span>E-posta</span><input class="input" type="email" x-model="form.email" required><small class="error" x-text="fieldError('email')"></small></label>
+          <label class="field"><span>Telefon</span><input class="input" x-model="form.phone"><small class="error" x-text="fieldError('phone')"></small></label>
+        </div>
+        <label class="field"><span>Telegram ID</span><input class="input" x-model="form.telegram_id"><small class="error" x-text="fieldError('telegram_id')"></small></label>
+        <p class="hint" x-show="!editingId">Şifre otomatik oluşturulur; panelde Kullanıcılar sayfasında görünür, ilk girişte değiştirilir.</p>
+        <template x-if="editingId">
+          <div class="field">
+            <span>Yeni şifre belirle <small class="muted">(boş bırakılırsa değişmez; kullanıcı ilk girişte yenisini belirler)</small></span>
+            <div class="form-row">
+              <input class="input" type="password" x-model="newPassword" placeholder="Yeni şifre (en az 8 karakter)" autocomplete="new-password">
+              <input class="input" type="password" x-model="newPasswordConfirm" placeholder="Yeni şifre (tekrar)" autocomplete="new-password">
+            </div>
+            <small class="error" x-text="fieldError('password')"></small>
+          </div>
+        </template>
+      </div>
+      <div class="modal-foot">
+        <button type="button" class="btn btn-ghost" @click="modalOpen = false">Vazgeç</button>
+        <button class="btn btn-primary" :disabled="saving" x-text="saving ? 'Kaydediliyor…' : 'Kaydet'"></button>
+      </div>
+    </form>
+  </div>
+</section>
