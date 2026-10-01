@@ -1,4 +1,6 @@
-// İşletim sisteminin kendi bildirimleri (Windows bildirim merkezi vb.).
+// İşletim sisteminin kendi bildirimleri (Windows bildirim merkezi vb.), sesli.
+// Not: bildirimin üstündeki uygulama adı geliştirme modunda "Windows PowerShell" görünür; kurulu
+// uygulamada (npm run tauri build) tauri.conf.json'daki productName görünür.
 import { isPermissionGranted, requestPermission, sendNotification } from '@tauri-apps/plugin-notification';
 import { isTauri } from './http.js';
 
@@ -28,9 +30,9 @@ export async function systemNotify(title, body = '') {
   }
 
   if (isTauri) {
-    sendNotification({ title, body });
+    sendNotification({ title, body, sound: 'Default' });
   } else {
-    new Notification(title, { body });
+    new Notification(title, { body, silent: false });
   }
 
   return true;

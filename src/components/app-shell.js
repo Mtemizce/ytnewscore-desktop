@@ -6,6 +6,7 @@ import { whenUnauthorized } from '../core/http.js';
 import { systemNotify } from '../core/notify.js';
 import { isInsecureRemote, session } from '../core/session.js';
 import { onLockRequested, toggleWidget } from '../core/desktop.js';
+import { connectRealtime, disconnectRealtime } from '../core/realtime.js';
 import { toggleFullscreen } from '../core/window.js';
 
 const POLL_MS = 60_000;
@@ -53,6 +54,7 @@ export function appShell() {
     unreadCount: 0,
     bellOpen: false,
     pollTimer: null,
+    realtime: false,
 
     initials,
 
@@ -146,6 +148,7 @@ export function appShell() {
 
     startSession() {
       api.info().then((info) => { this.serverName = info?.name ?? ''; }).catch(() => {});
+      this.startRealtime();
       api.me.show().then((response) => this.$store.auth.set(response.data)).then(() => this.ensureVisibleSection()).catch(() => {});
       this.ensureVisibleSection();
       this.$store.stats.start();
@@ -159,6 +162,8 @@ export function appShell() {
       clearInterval(this.pollTimer);
       clearTimeout(this.idleTimer);
       this.$store.stats.stop();
+      disconnectRealtime();
+      this.realtime = false;
       session.clear();
       this.$store.auth.clear();
       this.authenticated = false;
@@ -260,6 +265,42 @@ export function appShell() {
 
     // --- Bildirimler ---------------------------------------------------------------
 
+    /**
+     * Reverb: yeni bildirim anında sistem bildirimi olur ve Pano yenilenir; dakikalık Pano sinyali
+     * anlık ziyaretçiyi günceller. Reverb yoksa yoklama (polling) devam eder.
+     */
+    async startRealtime() {
+      try {
+        const connection = await connectRealtime();
+        if (!connection) {
+          return;
+        }
+        const { echo, channels } = connection;
+        echo.private(channels.notifications).listen('.InAppNotificationCreated', (event) => this.onLiveNotification(event));
+        echo.private(channels.dashboard).listen('.DashboardUpdated', () => this.$store.stats.refresh());
+        echo.connector.pusher.connection.bind('state_change', ({ current }) => { this.realtime = current === 'connected'; });
+      } catch {
+        this.realtime = false;
+      }
+    },
+
+    onLiveNotification(event) {
+      const notification = { id: event.id, type: event.type, title: event.title, body: event.body, action_url: event.actionUrl, is_read: false, created_at: event.createdAt };
+      if (this.notifications.some((n) => n.id === notification.id)) {
+        return;
+      }
+      this.notifications = [notification, ...this.notifications].slice(0, 20);
+      this.unreadCount += 1;
+      localStorage.setItem(LAST_SEEN_KEY, String(Math.max(Number(localStorage.getItem(LAST_SEEN_KEY) || 0), notification.id)));
+      this.showSystemNotification(notification);
+      this.$store.stats.refresh();
+    },
+
+    /** Başlık: haber sitesinin adı; gövde: bildirimin başlığı ve metni. */
+    showSystemNotification(n) {
+      systemNotify(this.serverName || 'YTNewsCore', [n.title, n.body].filter(Boolean).join(' — '));
+    },
+
     /** Son görülen id'den yeni olanlar sistem bildirimi olarak gösterilir; ilk açılışta yalnız işaret konur. */
     async pollNotifications(firstRun = false) {
       try {
@@ -273,7 +314,7 @@ export function appShell() {
           this.notifications
             .filter((n) => n.id > lastSeen && !n.is_read)
             .reverse()
-            .forEach((n) => systemNotify(n.title, n.body || ''));
+            .forEach((n) => this.showSystemNotification(n));
         }
         localStorage.setItem(LAST_SEEN_KEY, String(newest));
       } catch {
@@ -297,7 +338,7 @@ export function appShell() {
     },
 
     testNotification() {
-      systemNotify('YTNewsCore', 'Sistem bildirimleri çalışıyor.').then((ok) => {
+      systemNotify(this.serverName || 'YTNewsCore', 'Sistem bildirimleri çalışıyor.').then((ok) => {
         if (!ok) {
           this.$store.ui.notify('error', 'Bildirim izni verilmedi (Windows: Ayarlar › Sistem › Bildirimler).');
         }
