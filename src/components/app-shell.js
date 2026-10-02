@@ -17,6 +17,13 @@ const LOCKED_KEY = 'app_locked';
 const APPROVAL_POLL_MS = 20_000;
 const TELEGRAM_WAIT_MS = 200_000;
 
+function emptyReset() {
+  return {
+    active: false, step: 'verify', challenge: null, methods: [], method: 'totp',
+    code: '', password: '', confirm: '', busy: false, error: '', telegram: { waiting: false, message: '' },
+  };
+}
+
 function emptyTwoFactor() {
   return { challenge: null, code: '', methods: [], telegram: { waiting: false, message: '' } };
 }
@@ -33,6 +40,8 @@ export function appShell() {
     settingsOpen: false,
     form: { baseUrl: appSettings.get().serverUrl || accounts.active()?.baseUrl || '', login: '', password: '' },
     twoFactor: emptyTwoFactor(),
+    reset: emptyReset(),
+    resetTimer: null,
     telegramTimer: null,
     loginError: '',
     loggingIn: false,
@@ -314,31 +323,109 @@ export function appShell() {
       });
     },
 
-    /** "Şifremi unuttum": yalnız hesap adıyla Telegram'a onay sorusu gider; onaylayınca giriş tamamlanır. */
-    async startForgotTelegram() {
+    // --- Şifremi unuttum -------------------------------------------------------------------
+    // Hesap → Authenticator kodu ya da Telegram'da "Evet, Sıfırla" → yeni parola (mevcut parola sorulmaz).
+
+    async startReset() {
       const login = this.form.login.trim();
       if (!login) {
         this.loginError = 'Önce e-posta ya da kullanıcı adınızı yazın.';
 
         return;
       }
-      clearInterval(this.telegramTimer);
       this.loggingIn = true;
       this.loginError = '';
       try {
-        const response = await session.withLogin(this.form.baseUrl, async () => api.auth.telegramForgot(login, await deviceName()));
-        this.twoFactor = {
-          ...emptyTwoFactor(),
-          challenge: response.challenge,
-          methods: ['telegram'],
-          telegram: { waiting: true, message: "Telegram'da (ya da açık başka bir uygulamada) gelen isteği onaylayın; 3 dakika içinde." },
-        };
-        const stopAt = Date.now() + TELEGRAM_WAIT_MS;
-        this.telegramTimer = setInterval(() => this.pollTelegramLogin(stopAt), 2000);
+        const response = await session.withLogin(this.form.baseUrl, async () => api.auth.passwordReset(login, await deviceName()));
+        this.reset = { ...emptyReset(), active: true, step: 'verify', challenge: response.challenge, methods: response.methods, method: response.methods[0] };
       } catch (error) {
         this.loginError = Object.values(error.errors || {}).flat()[0] || errorMessage(error);
       } finally {
         this.loggingIn = false;
+      }
+    },
+
+    cancelReset() {
+      clearInterval(this.resetTimer);
+      this.reset = emptyReset();
+      this.loginError = '';
+    },
+
+    async resetAskTelegram() {
+      clearInterval(this.resetTimer);
+      this.reset.error = '';
+      this.reset.telegram = { waiting: true, message: "Telegram'a istek gönderiliyor…" };
+      try {
+        await session.withLogin(this.form.baseUrl, async () => api.auth.passwordResetTelegram(this.reset.challenge, await deviceName()));
+        this.reset.telegram.message = 'Telegram\'da (ya da açık başka bir uygulamada) "Evet, Sıfırla" düğmesine dokunun; 3 dakika içinde.';
+        const stopAt = Date.now() + TELEGRAM_WAIT_MS;
+        this.resetTimer = setInterval(() => this.pollResetTelegram(stopAt), 2000);
+      } catch (error) {
+        this.reset.telegram = { waiting: false, message: '' };
+        this.reset.error = Object.values(error.errors || {}).flat()[0] || errorMessage(error);
+      }
+    },
+
+    async pollResetTelegram(stopAt) {
+      const stop = (message) => {
+        clearInterval(this.resetTimer);
+        this.reset.telegram = { waiting: false, message: '' };
+        this.reset.error = message;
+      };
+      if (Date.now() > stopAt) {
+        stop('Süre doldu. Yeniden deneyebilirsiniz.');
+
+        return;
+      }
+      try {
+        const result = await session.withLogin(this.form.baseUrl, () => api.auth.passwordResetStatus(this.reset.challenge));
+        if (result.status === 'pending') {
+          return;
+        }
+        clearInterval(this.resetTimer);
+        if (result.status === 'approved') {
+          this.reset.telegram = { waiting: false, message: '' };
+          this.reset.step = 'password';
+
+          return;
+        }
+        stop({ rejected: 'İstek Telegram’da iptal edildi.', blocked: 'Bu IP adresi engellendi.' }[result.status] || 'İstek sona erdi. Yeniden deneyebilirsiniz.');
+      } catch {
+        // Ağ dalgalanması: sonraki tur dener.
+      }
+    },
+
+    async resetVerifyCode() {
+      this.reset.busy = true;
+      this.reset.error = '';
+      try {
+        await session.withLogin(this.form.baseUrl, () => api.auth.passwordResetCode(this.reset.challenge, this.reset.code.trim()));
+        this.reset.step = 'password';
+      } catch (error) {
+        const message = Object.values(error.errors || {}).flat()[0] || errorMessage(error);
+        if (error.errors?.challenge) {
+          this.reset = emptyReset();
+          this.loginError = message;
+        } else {
+          this.reset.error = message;
+        }
+      } finally {
+        this.reset.busy = false;
+      }
+    },
+
+    async resetComplete() {
+      this.reset.busy = true;
+      this.reset.error = '';
+      try {
+        const response = await session.withLogin(this.form.baseUrl, () => api.auth.passwordResetComplete(this.reset.challenge, this.reset.password, this.reset.confirm));
+        this.reset = emptyReset();
+        this.form.password = '';
+        this.$store.ui.notify('success', response.message);
+      } catch (error) {
+        this.reset.error = Object.values(error.errors || {}).flat()[0] || errorMessage(error);
+      } finally {
+        this.reset.busy = false;
       }
     },
 

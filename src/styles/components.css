@@ -138,6 +138,8 @@
 .winbar-buttons .is-close:hover { background: #dc2626; color: #fff; }
 .app.is-frameless { padding-top: 28px; }
 .input-num { width: 110px; }
+.lock-telegram { background: rgb(14 165 233 / 90%); border-color: transparent; color: #fff; }
+.lock-telegram:hover { background: #0284c7; }
 .check { display: flex; align-items: center; gap: 8px; font-size: var(--fs-sm); }
 
 /* Hesap güvenliği penceresi: iki adımlı doğrulama ve Telegram ile giriş blokları. */

@@ -7,6 +7,13 @@
       </div>
 
       <div class="modal-body sec">
+        <section class="sec-block" x-show="factors.length > 0">
+          <div class="sec-title"><b>Giriş doğrulama yöntemi</b></div>
+          <p class="hint">Parolanızdan sonra hangi yöntemle doğrulanacağınızı seçin. İkisi de açıksa yalnız seçtiğiniz sorulur.</p>
+          <label class="check"><input type="radio" name="method" value="totp" :checked="me?.two_factor_method === 'totp'" :disabled="!factors.includes('totp')" @change="chooseMethod('totp')"> Authenticator kodu</label>
+          <label class="check"><input type="radio" name="method" value="telegram" :checked="me?.two_factor_method === 'telegram'" :disabled="!factors.includes('telegram')" @change="chooseMethod('telegram')"> Telegram onayı</label>
+        </section>
+
         <section class="sec-block">
           <div class="sec-title">
             <b>İki adımlı doğrulama (authenticator)</b>

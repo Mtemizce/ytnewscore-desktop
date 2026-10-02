@@ -46,6 +46,27 @@ export function securityPanel() {
       return Object.values(error.errors || {}).flat()[0] || errorMessage(error);
     },
 
+    // --- Giriş doğrulama yöntemi -----------------------------------------------------------
+
+    get factors() {
+      return this.me?.second_factors ?? [];
+    },
+
+    async chooseMethod(method) {
+      try {
+        const response = await api.me.twoFactorMethod(method);
+        this.me = response.data;
+        const active = accounts.active();
+        if (active) {
+          accounts.update(active.id, { user: response.data });
+          window.dispatchEvent(new CustomEvent('profile-updated'));
+        }
+        this.$store.ui.notify('success', 'Giriş doğrulama yöntemi güncellendi.');
+      } catch (error) {
+        this.$store.ui.notify('error', this.firstError(error));
+      }
+    },
+
     // --- Authenticator (iki adımlı doğrulama) ----------------------------------------------
 
     async startTwoFactor() {

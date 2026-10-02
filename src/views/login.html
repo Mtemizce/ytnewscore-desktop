@@ -1,5 +1,5 @@
 <div class="login">
-  <form class="login-card" @submit.prevent="doLogin" x-show="!twoFactor.challenge">
+  <form class="login-card" @submit.prevent="doLogin" x-show="!twoFactor.challenge && !reset.active">
     <div class="brand brand-dark">
       <span class="brand-mark">YT</span>
       <span>YTNews<b>Core</b> <small>Hesap Ekle</small></span>
@@ -25,12 +25,12 @@
     <button class="btn btn-primary btn-block" :disabled="loggingIn">
       <span x-text="loggingIn ? 'Giriş yapılıyor…' : 'Giriş Yap'"></span>
     </button>
-    <button type="button" class="link" :disabled="loggingIn || twoFactor.telegram.waiting" @click="startForgotTelegram()">Şifremi unuttum: Telegram ile giriş yap</button>
+    <button type="button" class="link" :disabled="loggingIn" @click="startReset()">Şifremi unuttum</button>
     <button type="button" class="link" x-show="list.length" @click="showAccounts()">‹ Hesaplara dön</button>
     <p class="hint">Cihaz adı otomatik gönderilir; bağlantıyı panelde Ayarlar › API › Bağlı Hesaplar'dan kesebilirsiniz.</p>
   </form>
 
-  <form class="login-card" @submit.prevent="doTwoFactor" x-show="twoFactor.challenge">
+  <form class="login-card" @submit.prevent="doTwoFactor" x-show="twoFactor.challenge && !reset.active">
     <div class="brand brand-dark">
       <span class="brand-mark">YT</span>
       <span x-text="twoFactor.methods.includes('totp') ? 'İki Adımlı Doğrulama' : 'Telegram ile Doğrulama'"></span>
@@ -55,4 +55,42 @@
 
     <button type="button" class="link" @click="cancelTwoFactor()">‹ Girişe dön</button>
   </form>
+  <div class="login-card" x-show="reset.active">
+    <div class="brand brand-dark">
+      <span class="brand-mark">YT</span>
+      <span x-text="reset.step === 'password' ? 'Yeni Parola' : 'Şifremi Unuttum'"></span>
+    </div>
+
+    <div x-show="reset.step === 'verify'">
+      <p class="hint">Kimliğinizi hesabınızdaki yöntemlerden biriyle doğrulayın.</p>
+      <div class="sec-actions" x-show="reset.methods.length > 1">
+        <button type="button" class="btn btn-sm" :class="reset.method === 'totp' ? 'btn-primary' : 'btn-ghost'" @click="reset.method = 'totp'">Authenticator kodu</button>
+        <button type="button" class="btn btn-sm" :class="reset.method === 'telegram' ? 'btn-primary' : 'btn-ghost'" @click="reset.method = 'telegram'">Telegram</button>
+      </div>
+
+      <form class="sec-form" x-show="reset.method === 'totp' && reset.methods.includes('totp')" @submit.prevent="resetVerifyCode()">
+        <label class="field">
+          <span>Doğrulama kodu (ya da kurtarma kodu)</span>
+          <input class="input input-code" x-model="reset.code" inputmode="numeric" autocomplete="one-time-code" maxlength="32">
+        </label>
+        <button class="btn btn-primary btn-block" :disabled="reset.busy || !reset.code" x-text="reset.busy ? 'Doğrulanıyor…' : 'Doğrula'"></button>
+      </form>
+
+      <div class="sec-form" x-show="reset.method === 'telegram' && reset.methods.includes('telegram')">
+        <p class="hint">Telegram'a "Şifrenizi mi sıfırlamak istiyorsunuz?" sorusu gider; <b>Evet, Sıfırla</b>'ya dokunun.</p>
+        <button type="button" class="btn btn-primary btn-block" :disabled="reset.telegram.waiting" @click="resetAskTelegram()">Telegram ile doğrula</button>
+        <p class="hint" x-show="reset.telegram.message" x-text="reset.telegram.message"></p>
+      </div>
+    </div>
+
+    <form class="sec-form" x-show="reset.step === 'password'" @submit.prevent="resetComplete()">
+      <p class="hint">Doğrulandı. Yeni parolanızı belirleyin; mevcut parola sorulmaz.</p>
+      <label class="field"><span>Yeni parola</span><input class="input" type="password" x-model="reset.password" autocomplete="new-password" minlength="8" required></label>
+      <label class="field"><span>Yeni parola (tekrar)</span><input class="input" type="password" x-model="reset.confirm" autocomplete="new-password" minlength="8" required></label>
+      <button class="btn btn-primary btn-block" :disabled="reset.busy" x-text="reset.busy ? 'Kaydediliyor…' : 'Parolayı Güncelle'"></button>
+    </form>
+
+    <p class="alert alert-error" x-show="reset.error" x-text="reset.error"></p>
+    <button type="button" class="link" @click="cancelReset()">‹ Girişe dön</button>
+  </div>
 </div>

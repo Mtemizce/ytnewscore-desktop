@@ -8,8 +8,16 @@ export const api = {
   auth: {
     login: (login, password, deviceName) => request('POST', '/auth/login', { login, password, device_name: deviceName }),
     twoFactor: (challenge, code) => request('POST', '/auth/two-factor', { challenge, code }),
-    /** "Şifremi unuttum": yalnız hesap adıyla Telegram onayı ister (parolasız); challenge döner, aynı status ucu yoklanır. */
-    telegramForgot: (login, deviceName) => request('POST', '/auth/telegram/forgot', { login, device_name: deviceName }),
+    /**
+     * "Şifremi unuttum": hesabı belirt → Authenticator kodu ya da Telegram'da "Evet, Sıfırla" ile doğrula
+     * → yeni parola (mevcut parola sorulmaz). `challenge` her adımda taşınır.
+     */
+    passwordReset: (login, deviceName) => request('POST', '/auth/password-reset', { login, device_name: deviceName }),
+    passwordResetTelegram: (challenge, deviceName) => request('POST', '/auth/password-reset/telegram', { challenge, device_name: deviceName }),
+    passwordResetStatus: (challenge) => request('POST', '/auth/password-reset/status', { challenge }),
+    passwordResetCode: (challenge, code) => request('POST', '/auth/password-reset/code', { challenge, code }),
+    passwordResetComplete: (challenge, password, passwordConfirmation) =>
+      request('POST', '/auth/password-reset/complete', { challenge, password, password_confirmation: passwordConfirmation }),
     /** Girişte Telegram onayı: iste, sonra aynı challenge ile durumu yokla (onaylanınca token gelir). */
     telegram: (challenge) => request('POST', '/auth/telegram', { challenge }),
     telegramStatus: (challenge) => request('POST', '/auth/telegram/status', { challenge }),
@@ -25,6 +33,8 @@ export const api = {
     unlockTelegram: (deviceName) => request('POST', '/me/unlock/telegram', { device_name: deviceName }),
     unlockTelegramStatus: (approvalId, secret) => request('POST', '/me/unlock/telegram/status', { approval_id: approvalId, secret }),
     /** Hesap güvenliği: authenticator ile iki adımlı doğrulama (kur, doğrula, parolayla kapat). */
+    /** Girişte hangi ikinci faktör sorulsun (iki yöntem de açıksa): totp ya da telegram. */
+    twoFactorMethod: (method) => request('PUT', '/me/two-factor-method', { method }),
     twoFactorSetup: () => request('POST', '/me/two-factor/setup'),
     twoFactorConfirm: (code) => request('POST', '/me/two-factor/confirm', { code }),
     twoFactorDisable: (password) => request('DELETE', '/me/two-factor', { password }),
