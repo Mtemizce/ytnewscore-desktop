@@ -15,6 +15,10 @@
     }
   }
 
+  // Panel sayfasının kullanıcı menüsü (profil resmi) uygulama işlemlerini buradan yaptırır: 'lock' (uygulamayı kilitle),
+  // 'switch' (hesap değiştir). Yalnız `panel_action`'ın izin verdiği işlemler çalışır.
+  window.__ytnDesktopAct = act;
+
   // Panelin kendi adresleri içinde gezinme (geri/ileri düğmesi olmayan pencerede, ör. yetkisiz
   // sayfa ekranından çıkmak için) sayfada yapılır; geri kalanı uygulamaya gider.
   var LOCAL = {
@@ -156,7 +160,7 @@
       '<div class="backdrop" hidden></div>' +
       '<div class="downloads"></div>' +
       '<div class="frame" hidden><div class="grip" title="Pencereyi sürükle (çift tık: büyüt / geri al)"></div>' +
-      '<div class="wc"><button type="button" data-win="minimize" title="Küçült">&#8211;</button><button type="button" data-win="maximize" title="Büyüt / geri al">&#9633;</button><button type="button" class="x" data-win="quit" title="Uygulamayı kapat">&#10005;</button></div></div>' +
+      '<div class="wc"><button type="button" data-win="minimize" title="Küçült">&#8211;</button><button type="button" data-win="maximize" title="Büyüt / geri al">&#9633;</button><button type="button" class="x" data-win="hide" title="Kapat (sistem tepsisine küçültür)">&#10005;</button></div></div>' +
       '<nav class="drawer" aria-label="Uygulama menüsü"><div class="head"><span>YTNewsCore Masaüstü</span><button class="close" type="button" title="Kapat">✕</button></div>';
     GROUPS.forEach(function (group, index) {
       if (index > 0) {

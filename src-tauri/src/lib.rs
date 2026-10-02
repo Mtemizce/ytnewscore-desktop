@@ -233,6 +233,12 @@ async fn panel_action(app: AppHandle, action: String) -> Result<(), String> {
                 let _ = panel.minimize();
             }
         }
+        // Çerçevesiz panelin kapat düğmesi: normal pencere X'i gibi sistem tepsisine gizler (uygulamayı kapatmaz).
+        "hide" => {
+            if let Some(panel) = app.get_webview_window(PANEL_LABEL) {
+                let _ = panel.hide();
+            }
+        }
         "maximize" => {
             if let Some(panel) = app.get_webview_window(PANEL_LABEL) {
                 if panel.is_maximized().unwrap_or(false) {
