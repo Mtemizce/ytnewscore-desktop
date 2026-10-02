@@ -22,6 +22,14 @@ export const api = {
     /** Kilit ekranında parola yerine Telegram onayı. */
     unlockTelegram: (deviceName) => request('POST', '/me/unlock/telegram', { device_name: deviceName }),
     unlockTelegramStatus: (approvalId, secret) => request('POST', '/me/unlock/telegram/status', { approval_id: approvalId, secret }),
+    /** Hesap güvenliği: authenticator ile iki adımlı doğrulama (kur, doğrula, parolayla kapat). */
+    twoFactorSetup: () => request('POST', '/me/two-factor/setup'),
+    twoFactorConfirm: (code) => request('POST', '/me/two-factor/confirm', { code }),
+    twoFactorDisable: (password) => request('DELETE', '/me/two-factor', { password }),
+    /** Telegram ile giriş doğrulaması: parola + bağlı Telegram'da bir onay ile açılır, parolayla kapanır. */
+    telegramLoginStart: (password, deviceName) => request('POST', '/me/telegram-login', { password, device_name: deviceName }),
+    telegramLoginStatus: (approvalId, secret) => request('POST', '/me/telegram-login/status', { approval_id: approvalId, secret }),
+    telegramLoginDisable: (password) => request('DELETE', '/me/telegram-login', { password }),
   },
 
   notifications: {

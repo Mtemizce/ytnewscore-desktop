@@ -1,0 +1,88 @@
+<div class="modal-backdrop" x-show="securityOpen" style="display: none;" x-transition.opacity @keydown.escape.window="closeSecurity()">
+  <template x-if="securityOpen">
+    <div class="modal" x-data="securityPanel" @click.outside="closeSecurity()">
+      <div class="modal-head">
+        <h2>Hesap güvenliği · <span x-text="me?.name"></span></h2>
+        <button type="button" class="link" @click="closeSecurity()">Kapat</button>
+      </div>
+
+      <div class="modal-body sec">
+        <section class="sec-block">
+          <div class="sec-title">
+            <b>İki adımlı doğrulama (authenticator)</b>
+            <span class="badge" :class="me?.two_factor_enabled ? 'badge-green' : 'badge-slate'" x-text="me?.two_factor_enabled ? 'Açık' : 'Kapalı'"></span>
+          </div>
+          <p class="hint">Girişte şifrenin yanında doğrulama uygulamasındaki 6 haneli kod istenir.</p>
+
+          <template x-if="!me?.two_factor_enabled && twoFactor.step === 'idle'">
+            <div><button type="button" class="btn btn-primary btn-sm" @click="startTwoFactor()" :disabled="twoFactor.busy">Kurulumu başlat</button></div>
+          </template>
+
+          <template x-if="twoFactor.step === 'setup'">
+            <form class="sec-form" @submit.prevent="confirmTwoFactor()">
+              <p class="hint">Doğrulama uygulamanızla (Google Authenticator, Microsoft Authenticator…) QR kodu okutun, çıkan 6 haneli kodu girin.</p>
+              <img class="qr" :src="twoFactor.qr" alt="QR kod">
+              <p class="hint">QR okunmazsa anahtarı elle girin: <code x-text="twoFactor.secret"></code></p>
+              <input class="input input-code" x-model="twoFactor.code" inputmode="numeric" autocomplete="one-time-code" maxlength="6" placeholder="000000" required>
+              <div class="sec-actions">
+                <button type="button" class="btn btn-ghost btn-sm" @click="cancelTwoFactor()">Vazgeç</button>
+                <button class="btn btn-primary btn-sm" :disabled="twoFactor.busy" x-text="twoFactor.busy ? 'Doğrulanıyor…' : 'Doğrula ve aç'"></button>
+              </div>
+            </form>
+          </template>
+
+          <template x-if="twoFactor.step === 'codes'">
+            <div class="sec-form">
+              <p class="hint hint-warn">Kurtarma kodları yalnız şimdi gösterilir. Telefonunuza erişemezseniz her biri bir kez kullanılabilir; güvenli bir yere kaydedin.</p>
+              <div class="codes"><template x-for="code in twoFactor.recovery" :key="code"><code x-text="code"></code></template></div>
+              <div class="sec-actions">
+                <button type="button" class="btn btn-ghost btn-sm" @click="copyRecoveryCodes()">Kopyala</button>
+                <button type="button" class="btn btn-primary btn-sm" @click="cancelTwoFactor()">Kaydettim</button>
+              </div>
+            </div>
+          </template>
+
+          <template x-if="me?.two_factor_enabled && twoFactor.step === 'idle'">
+            <form class="sec-form" @submit.prevent="disableTwoFactor()">
+              <input class="input" type="password" x-model="twoFactor.password" placeholder="Kapatmak için parolanız" autocomplete="current-password" required>
+              <div class="sec-actions"><button class="btn btn-ghost-danger btn-sm" :disabled="twoFactor.busy">Kapat</button></div>
+            </form>
+          </template>
+
+          <p class="alert alert-error" x-show="twoFactor.error" x-text="twoFactor.error"></p>
+        </section>
+
+        <section class="sec-block">
+          <div class="sec-title">
+            <b>Telegram ile giriş doğrulaması</b>
+            <span class="badge" :class="me?.telegram_login_enabled ? 'badge-green' : 'badge-slate'" x-text="me?.telegram_login_enabled ? 'Açık' : 'Kapalı'"></span>
+          </div>
+          <p class="hint">Girişte şifreden sonra Telegram'a Onayla / Reddet / Engelle sorusu gider; onaylayınca giriş tamamlanır. Kod yazmak gerekmez.</p>
+
+          <p class="hint hint-warn" x-show="!me?.telegram_login_enabled && !canEnableTelegram">Önce panelde Profil sayfasından Telegram kimliğinizi bağlayın.</p>
+
+          <template x-if="!me?.telegram_login_enabled && canEnableTelegram && !telegram.waiting">
+            <form class="sec-form" @submit.prevent="enableTelegram()">
+              <input class="input" type="password" x-model="telegram.password" placeholder="Etkinleştirmek için parolanız" autocomplete="current-password" required>
+              <div class="sec-actions"><button class="btn btn-primary btn-sm" :disabled="telegram.busy" x-text="telegram.busy ? 'Gönderiliyor…' : 'Etkinleştir'"></button></div>
+            </form>
+          </template>
+
+          <div class="sec-form" x-show="telegram.waiting">
+            <p class="hint" x-text="telegram.message"></p>
+            <div class="sec-actions"><button type="button" class="btn btn-ghost btn-sm" @click="cancelTelegram()">Vazgeç</button></div>
+          </div>
+
+          <template x-if="me?.telegram_login_enabled">
+            <form class="sec-form" @submit.prevent="disableTelegram()">
+              <input class="input" type="password" x-model="telegram.password" placeholder="Kapatmak için parolanız" autocomplete="current-password" required>
+              <div class="sec-actions"><button class="btn btn-ghost-danger btn-sm" :disabled="telegram.busy">Kapat</button></div>
+            </form>
+          </template>
+
+          <p class="alert alert-error" x-show="telegram.error" x-text="telegram.error"></p>
+        </section>
+      </div>
+    </div>
+  </template>
+</div>

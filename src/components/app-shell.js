@@ -1,4 +1,4 @@
-// Kabuk: hesap seçici (çok site/hesap, 2FA ya da Telegram onayıyla ekleme), panel penceresini açma,
+// Kabuk: hesap seçici (çok site/hesap, 2FA ya da Telegram onayıyla ekleme), hesap güvenliği, panel penceresini açma,
 // yalnız kullanıcı kilitleyince çıkan kilit ekranı (parola ya da Telegram onayı), giriş onay soruları,
 // arka planda sistem bildirimleri (Reverb + yoklama) ve tepsi ipucu. Panelin ekranları panelden gelir.
 import { api } from '../api/index.js';
@@ -47,6 +47,9 @@ export function appShell() {
     ownApprovals: new Set(),
     notifiedApprovals: new Set(),
 
+    // Hesap güvenliği penceresi (iki adımlı doğrulama, Telegram ile giriş).
+    securityOpen: false,
+
     pollTimer: null,
     panelOpen: false,
     readyTimer: null,
@@ -62,6 +65,7 @@ export function appShell() {
       onShellEvent('panel://ready', () => this.panelReady());
       onShellEvent('app://accounts', () => this.switchAccount());
       onShellEvent('app://lock', () => this.lock());
+      window.addEventListener('profile-updated', () => this.refreshList());
       window.addEventListener('keydown', (event) => {
         if (event.key === 'F11') {
           event.preventDefault();
@@ -228,6 +232,16 @@ export function appShell() {
       this.setLockedState(false);
       this.panelOpen = false;
       await closePanel();
+    },
+
+    openSecurity() {
+      if (this.active?.token) {
+        this.securityOpen = true;
+      }
+    },
+
+    closeSecurity() {
+      this.securityOpen = false;
     },
 
     // --- Hesap ekleme -------------------------------------------------------------------
