@@ -657,6 +657,10 @@ export function appShell() {
         if (next && !this.approval && this.panelOpen) {
           setShellVisible(true);
         }
+        // Answered somewhere else (or expired): the card closes and the panel comes back, nothing to press.
+        if (!next && this.approval && this.panelOpen && !this.locked) {
+          setShellVisible(false);
+        }
         this.approval = next;
       } catch {
         // Bir sonraki turu bekler.

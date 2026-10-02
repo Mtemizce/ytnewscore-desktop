@@ -9,7 +9,8 @@
       <div class="modal-body sec">
         <section class="sec-block" x-show="factors.length > 0">
           <div class="sec-title"><b>Giriş doğrulama yöntemi</b></div>
-          <p class="hint">Parolanızdan sonra hangi yöntemle doğrulanacağınızı seçin. İkisi de açıksa yalnız seçtiğiniz sorulur.</p>
+ <p class="hint">Authenticator açıksa girişte kesinlikle sorulur (Telegram da açıksa ikisinden birini seçersiniz). Yalnız Telegram açıksa siz seçmedikçe sorulmaz; parolayla girilir.</p>
+          <label class="check" x-show="!factors.includes('totp')"><input type="radio" name="method" value="none" :checked="!me?.two_factor_method" @change="chooseMethod('none')"> Yalnız parola</label>
           <label class="check"><input type="radio" name="method" value="totp" :checked="me?.two_factor_method === 'totp'" :disabled="!factors.includes('totp')" @change="chooseMethod('totp')"> Authenticator kodu</label>
           <label class="check"><input type="radio" name="method" value="telegram" :checked="me?.two_factor_method === 'telegram'" :disabled="!factors.includes('telegram')" @change="chooseMethod('telegram')"> Telegram onayı</label>
         </section>
