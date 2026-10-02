@@ -28,6 +28,10 @@ export function settingsPanel() {
       return Boolean(this.form.serverUrl) && isInsecureRemote(this.form.serverUrl);
     },
 
+    isPreset(preset) {
+      return Number(this.form.width) === preset.width && Number(this.form.height) === preset.height;
+    },
+
     usePreset(preset) {
       this.form.width = preset.width;
       this.form.height = preset.height;

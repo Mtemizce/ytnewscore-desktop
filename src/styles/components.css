@@ -129,13 +129,14 @@
 .ban-grid dd { margin: 0; overflow: hidden; text-overflow: ellipsis; color: var(--text); font-weight: 500; }
 
 /* Çerçevesiz kip: kendi başlık çubuğumuz (sürükleme alanı + pencere düğmeleri). */
+.app > .winbar { height: 28px; }
 .winbar { position: fixed; top: 0; left: 0; right: 0; z-index: 70; display: flex; align-items: center; justify-content: space-between; height: 28px; background: #0f172a; color: #94a3b8; font-size: var(--fs-xs); user-select: none; }
 .winbar-title { padding-left: 12px; }
 .winbar-buttons { display: flex; height: 100%; }
 .winbar-buttons button { width: 42px; border: 0; background: none; color: #cbd5e1; font-size: 14px; }
 .winbar-buttons button:hover { background: #1e293b; }
 .winbar-buttons .is-close:hover { background: #dc2626; color: #fff; }
-.app:has(.winbar:not([style*="none"])) { padding-top: 28px; }
+.app.is-frameless { padding-top: 28px; }
 .input-num { width: 110px; }
 .check { display: flex; align-items: center; gap: 8px; font-size: var(--fs-sm); }
 

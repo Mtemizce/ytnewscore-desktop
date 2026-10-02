@@ -1,4 +1,4 @@
-<div x-data="appShell" class="app">
+<div x-data="appShell" class="app" :class="{ 'is-frameless': settings.frameless }">
   <!-- Çerçevesiz kip: başlık çubuğu yok; sürükleme alanı ve pencere düğmeleri -->
   <div class="winbar" x-show="settings.frameless" style="display: none;" data-tauri-drag-region>
     <span class="winbar-title" data-tauri-drag-region>YTNewsCore</span>

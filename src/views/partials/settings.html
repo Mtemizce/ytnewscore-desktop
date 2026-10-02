@@ -25,7 +25,7 @@
           </div>
           <div class="sec-actions">
             <template x-for="preset in presets" :key="preset.label">
-              <button type="button" class="btn btn-ghost btn-sm" @click="usePreset(preset)" x-text="`${preset.label} (${preset.width}×${preset.height})`"></button>
+              <button type="button" class="btn btn-sm" :class="isPreset(preset) ? 'btn-primary' : 'btn-ghost'" :aria-pressed="isPreset(preset)" @click="usePreset(preset)" x-text="`${isPreset(preset) ? '✓ ' : ''}${preset.label} (${preset.width}×${preset.height})`"></button>
             </template>
           </div>
         </section>
