@@ -23,6 +23,24 @@
     reload: function () { window.location.reload(); },
   };
 
+  // WebView2 `target="_blank"` bağlantı tıklamalarını yeni pencere isteğine çevirmiyor (öz-test,
+  // log 558); `window.open` çeviriyor. Rust tarafı (`on_new_window`) panel dışını tarayıcıda,
+  // panelin kendi sayfalarını aynı pencerede açar. Panelin kendi tıklama işleyicileri önce çalışır.
+  document.addEventListener('click', function (event) {
+    if (event.defaultPrevented || event.button !== 0 || event.ctrlKey || event.shiftKey || event.metaKey) {
+      return;
+    }
+    var link = event.target && event.target.closest ? event.target.closest('a[href]') : null;
+    if (!link || link.hasAttribute('download') || (link.getAttribute('target') || '').toLowerCase() !== '_blank') {
+      return;
+    }
+    if (!/^https?:/i.test(link.href)) {
+      return;
+    }
+    event.preventDefault();
+    window.open(link.href, '_blank');
+  });
+
   document.addEventListener('keydown', function (event) {
     if (event.key === 'F11') {
       event.preventDefault();

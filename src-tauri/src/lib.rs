@@ -37,10 +37,19 @@ fn is_panel_path(path: &str) -> bool {
     path == "/admin" || path.starts_with("/admin/")
 }
 
+/// Panel dışı adresler varsayılan tarayıcıda. Olay işleyicisi içinden değil, arka plan
+/// görevinden açılır (WebView2 olayı sürerken kabuk çağrısı yapılmaz).
 fn open_in_browser(app: &AppHandle, url: &Url) {
-    if matches!(url.scheme(), "http" | "https") {
-        let _ = app.opener().open_url(url.as_str(), None::<&str>);
+    if !matches!(url.scheme(), "http" | "https") {
+        return;
     }
+    let app = app.clone();
+    let target = url.to_string();
+    tauri::async_runtime::spawn(async move {
+        if let Err(error) = app.opener().open_url(&target, None::<&str>) {
+            eprintln!("[ytn] tarayıcıda açılamadı {target}: {error}");
+        }
+    });
 }
 
 fn show_window(app: &AppHandle, label: &str) {
@@ -84,13 +93,29 @@ async fn open_panel(app: AppHandle, url: String, title: String) -> Result<(), St
     }
 
     let host = target.host_str().unwrap_or_default().to_string();
+    let new_window_host = host.clone();
     let handle = app.clone();
     let browser = app.clone();
+    let ready = app.clone();
     let window = WebviewWindowBuilder::new(&app, PANEL_LABEL, WebviewUrl::External(target))
         .title(&title)
         .inner_size(1360.0, 860.0)
         .min_inner_size(960.0, 600.0)
         .center()
+        // İlk sayfa yüklenene kadar gizli (beyaz pencere yerine kabukta "Açılıyor…" görünür);
+        // panelin zemin rengiyle açılır.
+        .visible(false)
+        .background_color(tauri::window::Color(248, 250, 252, 255))
+        .on_page_load(move |window, payload| {
+            if !matches!(payload.event(), tauri::webview::PageLoadEvent::Finished) {
+                return;
+            }
+            if !window.is_visible().unwrap_or(true) && !*ready.state::<AppState>().locked.lock().unwrap() {
+                let _ = window.show();
+                let _ = window.set_focus();
+            }
+            let _ = ready.emit("panel://ready", ());
+        })
         .initialization_script(PANEL_SCRIPT)
         .on_navigation(move |next| {
             // blob:, data:, about: (indirmeler, gömülü içerik) olduğu gibi.
@@ -118,15 +143,25 @@ async fn open_panel(app: AppHandle, url: String, title: String) -> Result<(), St
                 _ => true,
             }
         })
-        // target="_blank" ve window.open: varsayılan tarayıcıda.
+        // Yeni sekme / window.open: panelin kendi sayfası aynı pencerede (tarayıcıda oturum yok),
+        // gerisi varsayılan tarayıcıda.
         .on_new_window(move |url, _features| {
-            open_in_browser(&browser, &url);
+            if url.host_str().unwrap_or_default() == new_window_host && is_panel_path(url.path()) {
+                let app = browser.clone();
+                tauri::async_runtime::spawn(async move {
+                    if let Some(panel) = app.get_webview_window(PANEL_LABEL) {
+                        let _ = panel.navigate(url);
+                    }
+                });
+            } else {
+                open_in_browser(&browser, &url);
+            }
             NewWindowResponse::Deny
         })
         .on_download(downloads::handle)
         .build()
         .map_err(|e| e.to_string())?;
-    let _ = window.set_focus();
+    let _ = window;
 
     Ok(())
 }
@@ -354,6 +389,17 @@ pub fn run() {
         ])
         .setup(|app| {
             build_tray(app.handle())?;
+            // Yalnız geliştirme derlemesi: panel penceresini verilen adreste açar (bağlantı,
+            // indirme davranışını gerçek pencerede denemek için; giriş gerektirmez).
+            #[cfg(debug_assertions)]
+            if let Ok(url) = std::env::var("YTN_SELFTEST_PANEL_URL") {
+                let handle = app.handle().clone();
+                tauri::async_runtime::spawn(async move {
+                    if let Err(error) = open_panel(handle, url, "Öz-test".into()).await {
+                        eprintln!("[ytn] öz-test paneli açılamadı: {error}");
+                    }
+                });
+            }
             Ok(())
         })
         // Pencereleri kapatmak uygulamayı tepsiye gizler; çıkış tepsi menüsünden.

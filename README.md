@@ -18,7 +18,9 @@ Gereksinimler: Node.js 18+, Rust (https://rustup.rs). Windows'ta ayrıca Microso
 1. **Hesap ekle:** site adresi + e-posta/kullanıcı adı + şifre (2FA açıksa kod). Sunucu `/api/v1/auth/login` ile bir API token'ı verir; token bu bilgisayarda saklanır, şifre saklanmaz.
 2. **Hesabı aç:** kabuk token ile `/api/v1/auth/web-session`'dan 60 saniyelik tek kullanımlık giriş bağlantısı alır ve paneli `panel` penceresinde açar. Panel oturumu düşerse aynı yolla sessizce yeniden bağlanır.
 3. **Panelden çıkış** ve **Hesap Değiştir** bu hesabın token'ını iptal eder, panel kapanır; hesap listede "oturum kapalı" kalır ve yeniden girmek şifre ister (birden çok kişinin kullandığı bilgisayarda kimse başkasının paneline giremesin). Uygulama açılırken hatırlanan hesap kilit ekranıyla (şifre) açılır.
-4. Panel dışındaki adresler ("Sitede gör", "Siteye Git", başka siteler) ve yeni sekmeler varsayılan tarayıcıda açılır.
+4. Panel dışındaki adresler ("Sitede gör", "Siteye Git", başka siteler) varsayılan tarayıcıda açılır; panelin kendi sayfaları yeni sekme istese de aynı pencerede açılır. WebView2 `target="_blank"` tıklamalarını yeni pencere isteğine çevirmediği için panel script'i bunları `window.open`'a çevirir.
+   Panel penceresi ilk sayfası yüklenene kadar gizli kalır; o sırada hesap kartında "Açılıyor…" görünür.
+   Öz-test (yalnız geliştirme derlemesi): `YTN_SELFTEST_PANEL_URL=http://127.0.0.1:8765/admin/index.html` ile çalıştırılan uygulama panel penceresini o adreste açar (giriş gerekmez), bağlantı ve indirme davranışı gerçek pencerede denenir.
 5. Uzak panel sayfası yalnız `panel_action` komutunu çağırabilir (`capabilities/panel.json`; diğer komutlar `default.json`'da yalnız kabuk ve widget'a açık, `build.rs` izin listesi).
 
 ## Klasör yapısı

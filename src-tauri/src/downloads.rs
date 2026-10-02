@@ -6,6 +6,7 @@
 // indirme" diye engeller; o zaman indirme iptal edilir ve dosya panelin oturum çerezleriyle Rust
 // tarafından çekilir (yalnız GET; toplu ZIP gibi POST indirmeleri http'de yapılamaz).
 use std::{
+    collections::HashSet,
     io::Write,
     path::{Path, PathBuf},
     sync::{
@@ -26,6 +27,9 @@ const FALLBACK_NAME: &str = "indirilen-dosya";
 pub struct DownloadState {
     last: Mutex<Option<PathBuf>>,
     next_id: AtomicU64,
+    /// http'de iptal edilip Rust'ta indirilenler: WebView2 iptal edilen indirme için de
+    /// "bitti (başarısız)" bildirir; o olay yok sayılır (yoksa önce "İndirilemedi" görünürdü).
+    cancelled: Mutex<HashSet<String>>,
 }
 
 /// Son indirilen dosyayı açar ya da klasöründe seçili gösterir.
@@ -42,6 +46,7 @@ pub fn handle<R: Runtime>(webview: Webview<R>, event: DownloadEvent<'_>) -> bool
     match event {
         DownloadEvent::Requested { url, destination } => {
             if url.scheme() == "http" {
+                webview.app_handle().state::<DownloadState>().cancelled.lock().unwrap().insert(url.to_string());
                 let id = format!("d{}", webview.app_handle().state::<DownloadState>().next_id.fetch_add(1, Ordering::Relaxed));
                 card(&webview, &id, "started", "", None);
                 tauri::async_runtime::spawn(async move {
@@ -58,6 +63,9 @@ pub fn handle<R: Runtime>(webview: Webview<R>, event: DownloadEvent<'_>) -> bool
             true
         }
         DownloadEvent::Finished { url, path, success } => {
+            if webview.app_handle().state::<DownloadState>().cancelled.lock().unwrap().remove(url.as_str()) {
+                return true;
+            }
             let result = match (success, path) {
                 (true, Some(path)) => Ok(path),
                 (true, None) => Err("Dosya kaydedildi ama yeri bildirilmedi.".to_string()),

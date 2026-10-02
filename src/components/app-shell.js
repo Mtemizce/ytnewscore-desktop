@@ -4,7 +4,7 @@ import { api } from '../api/index.js';
 import { deviceName } from '../core/device.js';
 import { closePanel, onShellEvent, openPanel, setLocked, setShellVisible, systemIdleSeconds, toggleWindowFullscreen } from '../core/desktop.js';
 import { errorMessage, formatDate, initials } from '../core/format.js';
-import { whenUnauthorized } from '../core/http.js';
+import { isTauri, whenUnauthorized } from '../core/http.js';
 import { systemNotify } from '../core/notify.js';
 import { connectRealtime, disconnectRealtime } from '../core/realtime.js';
 import { accounts, isInsecureRemote, session } from '../core/session.js';
@@ -34,6 +34,7 @@ export function appShell() {
     pollTimer: null,
     idleTimer: null,
     panelOpen: false,
+    readyTimer: null,
     signingOut: false,
 
     initials,
@@ -43,6 +44,7 @@ export function appShell() {
       whenUnauthorized(() => this.markSignedOut(this.activeId, 'Bu hesabın bağlantısı kesildi; yeniden giriş yapın.'));
       onShellEvent('panel://logout', () => this.signOutActive());
       onShellEvent('panel://session-expired', () => this.reconnectPanel());
+      onShellEvent('panel://ready', () => this.panelReady());
       onShellEvent('app://accounts', () => this.switchAccount());
       onShellEvent('app://lock', () => this.lock());
       window.addEventListener('keydown', (event) => {
@@ -108,12 +110,29 @@ export function appShell() {
         this.refreshList();
         await openPanel(link.url, `${this.active.siteName || 'Panel'} — YTNewsCore`);
         this.panelOpen = true;
-        setShellVisible(false);
         this.startBackground();
+        // Panel penceresi ilk sayfası yüklenince kendini gösterir ve "panel://ready" yollar; o
+        // zamana kadar kart "Açılıyor…" kalır. Tarayıcıda (npm run dev) olay gelmez.
+        if (isTauri) {
+          clearTimeout(this.readyTimer);
+          this.readyTimer = setTimeout(() => this.panelReady(), 30_000);
+        } else {
+          this.panelReady();
+        }
       } catch (error) {
-        this.$store.ui.notify('error', errorMessage(error));
-      } finally {
         this.opening = null;
+        this.$store.ui.notify('error', errorMessage(error));
+      }
+    },
+
+    panelReady() {
+      clearTimeout(this.readyTimer);
+      if (this.opening === null) {
+        return;
+      }
+      this.opening = null;
+      if (!this.locked) {
+        setShellVisible(false);
       }
     },
 
