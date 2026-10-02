@@ -1,6 +1,6 @@
 // Hesap güvenliği penceresi: authenticator ile iki adımlı doğrulamayı kurma/kapatma ve "Telegram ile
-// giriş doğrulaması"nı açma/kapatma. Etkin hesabın token'ıyla çalışır; her iki yöntemi de
-// kapatmak için parola ister. Telegram'ı açmak, bağlı Telegram'da bir kez onay gerektirir.
+// giriş doğrulaması"nı açma/kapatma. Etkin hesabın token'ıyla çalışır; açmak için parola gerekmez
+// (oturum zaten açık; Telegram'ı açmak bağlı Telegram'da bir kez onay ister), kapatmak onay ve parola ister.
 import { api } from '../api/index.js';
 import { deviceName } from '../core/device.js';
 import { errorMessage } from '../core/format.js';
@@ -85,6 +85,9 @@ export function securityPanel() {
     },
 
     async disableTwoFactor() {
+      if (!(await this.$store.ui.confirm('İki adımlı doğrulama kapatılsın mı?'))) {
+        return;
+      }
       this.twoFactor.busy = true;
       this.twoFactor.error = '';
       try {
@@ -104,13 +107,13 @@ export function securityPanel() {
       return Boolean(this.me?.telegram_id);
     },
 
-    /** Parolayı doğrular ve bağlı Telegram'a onay sorusu gönderir; onay gelene kadar yoklar. */
+    /** Bağlı Telegram'a onay sorusu gönderir (oturum zaten açık, parola gerekmez); onay gelene kadar yoklar. */
     async enableTelegram() {
       clearInterval(this.timer);
       this.telegram.busy = true;
       this.telegram.error = '';
       try {
-        const started = await api.me.telegramLoginStart(this.telegram.password, await deviceName());
+        const started = await api.me.telegramLoginStart(await deviceName());
         this.telegram = { ...emptyTelegram(), waiting: true, message: "Telegram'daki isteği onaylayın (yalnız Telegram'dan onaylanır); 3 dakika içinde." };
         const stopAt = Date.now() + TELEGRAM_WAIT_MS;
         this.timer = setInterval(() => this.pollTelegram(started, stopAt), 2000);
@@ -155,6 +158,9 @@ export function securityPanel() {
     },
 
     async disableTelegram() {
+      if (!(await this.$store.ui.confirm('Telegram ile giriş doğrulaması kapatılsın mı?'))) {
+        return;
+      }
       this.telegram.busy = true;
       this.telegram.error = '';
       try {

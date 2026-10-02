@@ -26,8 +26,8 @@ export const api = {
     twoFactorSetup: () => request('POST', '/me/two-factor/setup'),
     twoFactorConfirm: (code) => request('POST', '/me/two-factor/confirm', { code }),
     twoFactorDisable: (password) => request('DELETE', '/me/two-factor', { password }),
-    /** Telegram ile giriş doğrulaması: parola + bağlı Telegram'da bir onay ile açılır, parolayla kapanır. */
-    telegramLoginStart: (password, deviceName) => request('POST', '/me/telegram-login', { password, device_name: deviceName }),
+    /** Telegram ile giriş doğrulaması: bağlı Telegram'da bir onayla açılır (parola gerekmez), parolayla kapanır. */
+    telegramLoginStart: (deviceName) => request('POST', '/me/telegram-login', { device_name: deviceName }),
     telegramLoginStatus: (approvalId, secret) => request('POST', '/me/telegram-login/status', { approval_id: approvalId, secret }),
     telegramLoginDisable: (password) => request('DELETE', '/me/telegram-login', { password }),
   },

@@ -62,10 +62,9 @@
           <p class="hint hint-warn" x-show="!me?.telegram_login_enabled && !canEnableTelegram">Önce panelde Profil sayfasından Telegram kimliğinizi bağlayın.</p>
 
           <template x-if="!me?.telegram_login_enabled && canEnableTelegram && !telegram.waiting">
-            <form class="sec-form" @submit.prevent="enableTelegram()">
-              <input class="input" type="password" x-model="telegram.password" placeholder="Etkinleştirmek için parolanız" autocomplete="current-password" required>
-              <div class="sec-actions"><button class="btn btn-primary btn-sm" :disabled="telegram.busy" x-text="telegram.busy ? 'Gönderiliyor…' : 'Etkinleştir'"></button></div>
-            </form>
+            <div class="sec-form">
+              <div class="sec-actions"><button type="button" class="btn btn-primary btn-sm" @click="enableTelegram()" :disabled="telegram.busy" x-text="telegram.busy ? 'Gönderiliyor…' : 'Etkinleştir (Telegram ile onayla)'"></button></div>
+            </div>
           </template>
 
           <div class="sec-form" x-show="telegram.waiting">

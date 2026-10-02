@@ -354,6 +354,8 @@ export function appShell() {
       clearInterval(this.telegramTimer);
       this.twoFactor = emptyTwoFactor();
       await this.stopActive();
+      // Giriş formu açık kalmasın: hesap kartı "Açılıyor…" gösterirken panel açılır.
+      this.view = 'accounts';
       this.refreshList();
       await this.open(this.list.find((a) => a.id === id));
     },
