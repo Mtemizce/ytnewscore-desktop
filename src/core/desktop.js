@@ -2,6 +2,7 @@
 import { invoke } from '@tauri-apps/api/core';
 import { listen } from '@tauri-apps/api/event';
 import { isTauri } from './http.js';
+import { appSettings } from './settings.js';
 
 // Widget penceresi kendini pencere etiketinden tanır (adres aynı index.html).
 export const isWidgetWindow = window.__TAURI_INTERNALS__?.metadata?.currentWindow?.label === 'widget' || window.location.hash === '#widget';
@@ -16,7 +17,28 @@ export function openPanel(url, title) {
     return Promise.resolve();
   }
 
-  return invoke('open_panel', { url, title });
+  const { width, height, frameless } = appSettings.get();
+
+  return invoke('open_panel', { url, title, width, height, frameless });
+}
+
+/** Ayarlar kaydedilince: açık pencerelerin çerçeve kipi ve panel boyutu hemen uygulanır. */
+export const applyWindowSettings = ({ width, height, frameless }) => call('apply_window_settings', { width, height, frameless });
+
+/** Çerçevesiz kabuk penceresinin düğmeleri (başlık çubuğu yok). */
+export async function windowControl(action) {
+  if (!isTauri) {
+    return;
+  }
+  const { getCurrentWindow } = await import('@tauri-apps/api/window');
+  const current = getCurrentWindow();
+  if (action === 'minimize') {
+    await current.minimize();
+  } else if (action === 'maximize') {
+    await current.toggleMaximize();
+  } else {
+    await current.close();
+  }
 }
 
 export const closePanel = () => call('close_panel');

@@ -81,13 +81,17 @@ fn show_main(app: AppHandle) {
 /// açılır. Uzak sayfa yalnız `panel_action`'ı çağırabilir.
 /// `async`: Windows'ta senkron komut içinden pencere oluşturmak kilitlenir.
 #[tauri::command]
-async fn open_panel(app: AppHandle, url: String, title: String) -> Result<(), String> {
+async fn open_panel(app: AppHandle, url: String, title: String, width: Option<f64>, height: Option<f64>, frameless: Option<bool>) -> Result<(), String> {
     let target: Url = url.parse().map_err(|e: url::ParseError| e.to_string())?;
     set_logging_out(&app, false);
+
+    let (panel_width, panel_height) = clamp_panel_size(width, height);
+    let frameless = frameless.unwrap_or(false);
 
     if let Some(window) = app.get_webview_window(PANEL_LABEL) {
         window.navigate(target).map_err(|e| e.to_string())?;
         let _ = window.set_title(&title);
+        apply_panel_frame(&window, frameless);
         show_window(&app, PANEL_LABEL);
         return Ok(());
     }
@@ -99,8 +103,10 @@ async fn open_panel(app: AppHandle, url: String, title: String) -> Result<(), St
     let ready = app.clone();
     let window = WebviewWindowBuilder::new(&app, PANEL_LABEL, WebviewUrl::External(target))
         .title(&title)
-        .inner_size(1360.0, 860.0)
+        .inner_size(panel_width, panel_height)
         .min_inner_size(960.0, 600.0)
+        // Ayarlar › "Çerçevesiz": başlık çubuğu yok; sürükleme ve pencere düğmeleri çekmece betiğinde.
+        .decorations(!frameless)
         .center()
         // İlk sayfa yüklenene kadar gizli (beyaz pencere yerine kabukta "Açılıyor…" görünür);
         // panelin zemin rengiyle açılır.
@@ -116,6 +122,7 @@ async fn open_panel(app: AppHandle, url: String, title: String) -> Result<(), St
             }
             let _ = ready.emit("panel://ready", ());
         })
+        .initialization_script(format!("window.__ytnFrameless = {frameless};"))
         .initialization_script(PANEL_SCRIPT)
         .on_navigation(move |next| {
             // blob:, data:, about: (indirmeler, gömülü içerik) olduğu gibi.
@@ -175,6 +182,32 @@ async fn close_panel(app: AppHandle) -> Result<(), String> {
     Ok(())
 }
 
+/// Ayarlardaki panel boyutu en az panelin alt sınırı kadar olur (960x600).
+fn clamp_panel_size(width: Option<f64>, height: Option<f64>) -> (f64, f64) {
+    (width.unwrap_or(1360.0).max(960.0), height.unwrap_or(860.0).max(600.0))
+}
+
+/// Çerçevesiz kipi açık panel penceresine uygular (yeniden oluşturmadan) ve çekmece betiğine bildirir.
+fn apply_panel_frame(window: &WebviewWindow, frameless: bool) {
+    let _ = window.set_decorations(!frameless);
+    let _ = window.eval(&format!("window.__ytnFrameless = {frameless}; window.__ytnApplyFrame && window.__ytnApplyFrame();"));
+}
+
+/// Ayarlar kaydedilince: kabuk ve (açıksa) panel penceresi çerçeve kipini, panel penceresi
+/// ayrıca varsayılan boyutu hemen alır. Kapalı pencereler bir sonraki açılışta ayarı okur.
+#[tauri::command]
+async fn apply_window_settings(app: AppHandle, width: Option<f64>, height: Option<f64>, frameless: bool) -> Result<(), String> {
+    if let Some(shell) = app.get_webview_window(SHELL_LABEL) {
+        let _ = shell.set_decorations(!frameless);
+    }
+    if let Some(panel) = app.get_webview_window(PANEL_LABEL) {
+        apply_panel_frame(&panel, frameless);
+        let (panel_width, panel_height) = clamp_panel_size(width, height);
+        let _ = panel.set_size(tauri::LogicalSize::new(panel_width, panel_height));
+    }
+    Ok(())
+}
+
 /// Çekmece menü ve F11 (panel sayfasından): tam ekran, kilit, widget, indirilenler, hesap
 /// değiştirme (oturumu kapatır), uygulamayı kapatma.
 #[tauri::command]
@@ -189,6 +222,26 @@ async fn panel_action(app: AppHandle, action: String) -> Result<(), String> {
         "downloads" => open_downloads(&app)?,
         "open-download" => downloads::open_last(&app, false)?,
         "reveal-download" => downloads::open_last(&app, true)?,
+        // Çerçevesiz panel penceresi: sürükleme tutamacı ve pencere düğmeleri (çekmece betiği).
+        "drag" => {
+            if let Some(panel) = app.get_webview_window(PANEL_LABEL) {
+                let _ = panel.start_dragging();
+            }
+        }
+        "minimize" => {
+            if let Some(panel) = app.get_webview_window(PANEL_LABEL) {
+                let _ = panel.minimize();
+            }
+        }
+        "maximize" => {
+            if let Some(panel) = app.get_webview_window(PANEL_LABEL) {
+                if panel.is_maximized().unwrap_or(false) {
+                    let _ = panel.unmaximize();
+                } else {
+                    let _ = panel.maximize();
+                }
+            }
+        }
         "quit" => app.exit(0),
         _ => return Err(format!("bilinmeyen işlem: {action}")),
     }
@@ -377,6 +430,7 @@ pub fn run() {
         .invoke_handler(tauri::generate_handler![
             show_main,
             open_panel,
+            apply_window_settings,
             close_panel,
             set_locked,
             set_shell_visible,
@@ -395,7 +449,7 @@ pub fn run() {
             if let Ok(url) = std::env::var("YTN_SELFTEST_PANEL_URL") {
                 let handle = app.handle().clone();
                 tauri::async_runtime::spawn(async move {
-                    if let Err(error) = open_panel(handle, url, "Öz-test".into()).await {
+                    if let Err(error) = open_panel(handle, url, "Öz-test".into(), None, None, None).await {
                         eprintln!("[ytn] öz-test paneli açılamadı: {error}");
                     }
                 });

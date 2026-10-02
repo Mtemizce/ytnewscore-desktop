@@ -8,6 +8,8 @@ export const api = {
   auth: {
     login: (login, password, deviceName) => request('POST', '/auth/login', { login, password, device_name: deviceName }),
     twoFactor: (challenge, code) => request('POST', '/auth/two-factor', { challenge, code }),
+    /** "Şifremi unuttum": yalnız hesap adıyla Telegram onayı ister (parolasız); challenge döner, aynı status ucu yoklanır. */
+    telegramForgot: (login, deviceName) => request('POST', '/auth/telegram/forgot', { login, device_name: deviceName }),
     /** Girişte Telegram onayı: iste, sonra aynı challenge ile durumu yokla (onaylanınca token gelir). */
     telegram: (challenge) => request('POST', '/auth/telegram', { challenge }),
     telegramStatus: (challenge) => request('POST', '/auth/telegram/status', { challenge }),

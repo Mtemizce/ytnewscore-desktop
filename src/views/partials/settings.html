@@ -1,0 +1,44 @@
+<div class="modal-backdrop" x-show="settingsOpen" style="display: none;" x-transition.opacity @keydown.escape.window="closeSettings()" @close-settings.window="settingsOpen = false">
+  <template x-if="settingsOpen">
+    <div class="modal" x-data="settingsPanel" @click.outside="closeSettings()">
+      <div class="modal-head">
+        <h2>Uygulama ayarları</h2>
+        <button type="button" class="link" x-show="settings.serverUrl" @click="closeSettings()">Kapat</button>
+      </div>
+
+      <form class="modal-body sec" @submit.prevent="save()">
+        <section class="sec-block">
+          <div class="sec-title"><b>Sunucu</b></div>
+          <p class="hint" x-show="firstRun">Haber sitenizin adresini bir kez tanımlayın; girişte tekrar sorulmaz. Sonra buradan değiştirebilirsiniz.</p>
+          <p class="hint" x-show="!firstRun">Yeni hesap eklerken kullanılır. Kayıtlı hesaplar kendi sunucusunda kalır.</p>
+          <input class="input" x-model="form.serverUrl" placeholder="https://site.com" autocomplete="off" required>
+          <p class="hint hint-warn" x-show="insecure">Bu adres HTTPS değil: şifre şifrelenmeden gider. Canlı sitede https:// kullanın.</p>
+        </section>
+
+        <section class="sec-block">
+          <div class="sec-title"><b>Panel penceresinin varsayılan boyutu</b></div>
+          <p class="hint">Panel her açıldığında bu boyutta başlar; en az <span x-text="minWidth"></span> × <span x-text="minHeight"></span>.</p>
+          <div class="sec-actions">
+            <input class="input input-num" type="number" x-model.number="form.width" :min="minWidth" step="10" aria-label="Genişlik">
+            <span>×</span>
+            <input class="input input-num" type="number" x-model.number="form.height" :min="minHeight" step="10" aria-label="Yükseklik">
+          </div>
+          <div class="sec-actions">
+            <template x-for="preset in presets" :key="preset.label">
+              <button type="button" class="btn btn-ghost btn-sm" @click="usePreset(preset)" x-text="`${preset.label} (${preset.width}×${preset.height})`"></button>
+            </template>
+          </div>
+        </section>
+
+        <section class="sec-block">
+          <div class="sec-title"><b>Çerçevesiz kullanım</b></div>
+          <label class="check"><input type="checkbox" x-model="form.frameless"> Pencere başlık çubuğunu kaldır</label>
+          <p class="hint">Açıkken pencereler çerçevesizdir: üstteki çubuktan (panelde ortadaki tutamaçtan) sürüklenir, sağ üstteki düğmelerle küçültülür, büyütülür, kapatılır. Kapalıyken normal pencere çerçevesi kullanılır.</p>
+        </section>
+
+        <p class="alert alert-error" x-show="error" x-text="error"></p>
+        <div class="sec-actions"><button class="btn btn-primary btn-sm">Kaydet</button></div>
+      </form>
+    </div>
+  </template>
+</div>

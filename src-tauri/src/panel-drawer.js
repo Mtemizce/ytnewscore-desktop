@@ -82,6 +82,15 @@
     '.item small { margin-left: auto; color: #64748b; font-size: 11px; }',
     '.item.danger svg { stroke: #f87171; }',
     '.sep { height: 1px; margin: 8px 6px; background: #1e293b; }',
+    '.frame { position: fixed; top: 0; left: 0; right: 0; z-index: 2147482999; height: 0; }',
+    '.frame[hidden] { display: none; }',
+    '.grip { position: absolute; top: 0; left: 50%; width: 150px; height: 14px; transform: translateX(-50%); border-radius: 0 0 8px 8px; background: rgb(15 23 42 / 70%); cursor: grab; opacity: .45; transition: opacity .15s; }',
+    '.grip:hover { opacity: 1; }',
+    '.grip::before { content: ""; position: absolute; top: 5px; left: 50%; width: 40px; height: 3px; border-radius: 2px; background: #94a3b8; transform: translateX(-50%); }',
+    '.wc { position: absolute; top: 0; right: 0; display: flex; }',
+    '.wc button { width: 38px; height: 24px; border: 0; background: rgb(15 23 42 / 70%); color: #e2e8f0; font: 13px/1 system-ui, sans-serif; cursor: pointer; opacity: .6; }',
+    '.wc button:hover { opacity: 1; background: #1e293b; }',
+    '.wc button.x:hover { background: #dc2626; }',
     '.downloads { position: fixed; bottom: 20px; left: 50%; z-index: 2147483003; display: grid; gap: 8px; width: min(360px, calc(100vw - 32px)); transform: translateX(-50%); font: 13px/1.4 system-ui, "Segoe UI", sans-serif; }',
     '.dl { display: grid; gap: 6px; padding: 10px 12px; border-radius: 10px; background: #0f172a; color: #e2e8f0; box-shadow: 0 10px 30px rgb(15 23 42 / 35%); }',
     '.dl-head { display: flex; align-items: center; gap: 8px; }',
@@ -146,6 +155,8 @@
       '<button class="handle" type="button" title="Uygulama menüsü"></button>' +
       '<div class="backdrop" hidden></div>' +
       '<div class="downloads"></div>' +
+      '<div class="frame" hidden><div class="grip" title="Pencereyi sürükle (çift tık: büyüt / geri al)"></div>' +
+      '<div class="wc"><button type="button" data-win="minimize" title="Küçült">&#8211;</button><button type="button" data-win="maximize" title="Büyüt / geri al">&#9633;</button><button type="button" class="x" data-win="quit" title="Uygulamayı kapat">&#10005;</button></div></div>' +
       '<nav class="drawer" aria-label="Uygulama menüsü"><div class="head"><span>YTNewsCore Masaüstü</span><button class="close" type="button" title="Kapat">✕</button></div>';
     GROUPS.forEach(function (group, index) {
       if (index > 0) {
@@ -159,6 +170,22 @@
     });
     root.innerHTML = html + '</nav>';
     downloads = root.querySelector('.downloads');
+
+    // Ayarlar › "Çerçevesiz": başlık çubuğu yokken sürükleme tutamacı ve pencere düğmeleri.
+    var frame = root.querySelector('.frame');
+    function applyFrame() {
+      frame.hidden = !window.__ytnFrameless;
+    }
+    window.__ytnApplyFrame = applyFrame;
+    applyFrame();
+    root.querySelector('.grip').addEventListener('mousedown', function (event) {
+      if (event.button === 0) {
+        act(event.detail > 1 ? 'maximize' : 'drag');
+      }
+    });
+    root.querySelectorAll('[data-win]').forEach(function (button) {
+      button.addEventListener('click', function () { act(button.getAttribute('data-win')); });
+    });
 
     var backdrop = root.querySelector('.backdrop');
     function toggle(open) {

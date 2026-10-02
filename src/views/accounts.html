@@ -5,6 +5,7 @@
       <span>YTNews<b>Core</b> <small>Hesap seçin</small></span>
     </div>
     <div class="account-tools">
+      <button type="button" class="link" @click="openSettings()">Ayarlar</button>
       <button type="button" class="link" x-show="active?.token" @click="openSecurity()">Güvenlik</button>
       <button type="button" class="link" x-show="active?.token" @click="lock()">Kilitle</button>
       <button type="button" class="link" @click="testNotification()">Bildirimi dene</button>

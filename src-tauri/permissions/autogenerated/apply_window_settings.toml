@@ -1,0 +1,11 @@
+# Automatically generated - DO NOT EDIT!
+
+[[permission]]
+identifier = "allow-apply-window-settings"
+description = "Enables the apply_window_settings command without any pre-configured scope."
+commands.allow = ["apply_window_settings"]
+
+[[permission]]
+identifier = "deny-apply-window-settings"
+description = "Denies the apply_window_settings command without any pre-configured scope."
+commands.deny = ["apply_window_settings"]

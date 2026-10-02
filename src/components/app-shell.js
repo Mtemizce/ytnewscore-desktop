@@ -3,12 +3,13 @@
 // arka planda sistem bildirimleri (Reverb + yoklama) ve tepsi ipucu. Panelin ekranları panelden gelir.
 import { api } from '../api/index.js';
 import { deviceName } from '../core/device.js';
-import { closePanel, onShellEvent, openPanel, setLocked, setShellVisible, toggleWindowFullscreen } from '../core/desktop.js';
+import { applyWindowSettings, closePanel, onShellEvent, openPanel, setLocked, setShellVisible, toggleWindowFullscreen, windowControl } from '../core/desktop.js';
 import { errorMessage, formatDate, initials } from '../core/format.js';
 import { isTauri, whenUnauthorized } from '../core/http.js';
 import { systemNotify } from '../core/notify.js';
 import { connectRealtime, disconnectRealtime } from '../core/realtime.js';
 import { accounts, isInsecureRemote, session } from '../core/session.js';
+import { appSettings } from '../core/settings.js';
 
 const POLL_MS = 60_000;
 const LAST_SEEN_KEY = 'last_notification_id';
@@ -27,7 +28,10 @@ export function appShell() {
     activeId: accounts.active()?.id ?? null,
     opening: null,
 
-    form: { baseUrl: accounts.active()?.baseUrl ?? session.defaultUrl, login: '', password: '' },
+    // Sunucu adresi girişte sorulmaz: Ayarlar'da bir kez tanımlanır (hesapların kendi sunucusu kalır).
+    settings: appSettings.get(),
+    settingsOpen: false,
+    form: { baseUrl: appSettings.get().serverUrl || accounts.active()?.baseUrl || '', login: '', password: '' },
     twoFactor: emptyTwoFactor(),
     telegramTimer: null,
     loginError: '',
@@ -66,6 +70,15 @@ export function appShell() {
       onShellEvent('app://accounts', () => this.switchAccount());
       onShellEvent('app://lock', () => this.lock());
       window.addEventListener('profile-updated', () => this.refreshList());
+      window.addEventListener('settings-updated', () => this.reloadSettings());
+
+      // Güncellemeden önce hesap eklemiş kullanıcı yeniden sunucu adresi girmez; ilk kurulumda Ayarlar açılır.
+      appSettings.adoptServerFrom(accounts.active() ?? accounts.list()[0]);
+      this.reloadSettings();
+      applyWindowSettings(this.settings);
+      if (!this.settings.serverUrl) {
+        this.settingsOpen = true;
+      }
       window.addEventListener('keydown', (event) => {
         if (event.key === 'F11') {
           event.preventDefault();
@@ -84,6 +97,35 @@ export function appShell() {
       }
       if (!this.list.length) {
         this.view = 'add';
+      }
+    },
+
+    reloadSettings() {
+      this.settings = appSettings.get();
+      if (this.view === 'add' && !this.twoFactor.challenge) {
+        this.form.baseUrl = this.settings.serverUrl || this.form.baseUrl;
+      }
+    },
+
+    openSettings() {
+      this.settingsOpen = true;
+    },
+
+    closeSettings() {
+      // Sunucu adresi tanımlanmadan kapanamaz (giriş için gerekli).
+      if (this.settings.serverUrl) {
+        this.settingsOpen = false;
+      }
+    },
+
+    windowControl,
+
+    /** Giriş formunda gösterilen sunucu (soru değil, bilgi). */
+    get serverLabel() {
+      try {
+        return new URL(this.form.baseUrl).host;
+      } catch {
+        return '—';
       }
     },
 
@@ -247,7 +289,7 @@ export function appShell() {
     // --- Hesap ekleme -------------------------------------------------------------------
 
     startAdd(account = null) {
-      this.form = { baseUrl: account?.baseUrl ?? this.active?.baseUrl ?? session.defaultUrl, login: account?.user?.email ?? '', password: '' };
+      this.form = { baseUrl: account?.baseUrl ?? this.settings.serverUrl, login: account?.user?.email ?? '', password: '' };
       clearInterval(this.telegramTimer);
       this.twoFactor = emptyTwoFactor();
       this.loginError = '';
@@ -270,6 +312,34 @@ export function appShell() {
         }
         await this.finishLogin(response);
       });
+    },
+
+    /** "Şifremi unuttum": yalnız hesap adıyla Telegram'a onay sorusu gider; onaylayınca giriş tamamlanır. */
+    async startForgotTelegram() {
+      const login = this.form.login.trim();
+      if (!login) {
+        this.loginError = 'Önce e-posta ya da kullanıcı adınızı yazın.';
+
+        return;
+      }
+      clearInterval(this.telegramTimer);
+      this.loggingIn = true;
+      this.loginError = '';
+      try {
+        const response = await session.withLogin(this.form.baseUrl, async () => api.auth.telegramForgot(login, await deviceName()));
+        this.twoFactor = {
+          ...emptyTwoFactor(),
+          challenge: response.challenge,
+          methods: ['telegram'],
+          telegram: { waiting: true, message: "Telegram'da (ya da açık başka bir uygulamada) gelen isteği onaylayın; 3 dakika içinde." },
+        };
+        const stopAt = Date.now() + TELEGRAM_WAIT_MS;
+        this.telegramTimer = setInterval(() => this.pollTelegramLogin(stopAt), 2000);
+      } catch (error) {
+        this.loginError = Object.values(error.errors || {}).flat()[0] || errorMessage(error);
+      } finally {
+        this.loggingIn = false;
+      }
     },
 
     async doTwoFactor() {
@@ -399,7 +469,7 @@ export function appShell() {
 
     /** Kilit ekranında "Şifremi unuttum": bağlı Telegram'a onay sorusu gider. */
     get canTelegramUnlock() {
-      return Boolean(this.user?.telegram_id);
+      return Boolean(this.user?.telegram_id && this.user?.telegram_login_enabled);
     },
 
     async unlockViaTelegram() {

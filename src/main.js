@@ -4,6 +4,7 @@ import Alpine from 'alpinejs';
 import './styles/index.css';
 import { appShell } from './components/app-shell.js';
 import { securityPanel } from './components/security-panel.js';
+import { settingsPanel } from './components/settings-panel.js';
 import { statsStore } from './components/stats-store.js';
 import { uiStore } from './components/ui-store.js';
 import { widget } from './components/widget.js';
@@ -20,6 +21,7 @@ if (isWidgetWindow) {
   document.getElementById('app').innerHTML = renderView('app');
   Alpine.data('appShell', appShell);
   Alpine.data('securityPanel', securityPanel);
+  Alpine.data('settingsPanel', settingsPanel);
 }
 
 window.Alpine = Alpine;

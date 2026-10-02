@@ -1,4 +1,13 @@
 <div x-data="appShell" class="app">
+  <!-- Çerçevesiz kip: başlık çubuğu yok; sürükleme alanı ve pencere düğmeleri -->
+  <div class="winbar" x-show="settings.frameless" style="display: none;" data-tauri-drag-region>
+    <span class="winbar-title" data-tauri-drag-region>YTNewsCore</span>
+    <span class="winbar-buttons">
+      <button type="button" title="Küçült" @click="windowControl('minimize')">&#8211;</button>
+      <button type="button" title="Büyüt / geri al" @click="windowControl('maximize')">&#9633;</button>
+      <button type="button" class="is-close" title="Kapat" @click="windowControl('close')">&#10005;</button>
+    </span>
+  </div>
   <div x-show="!locked">
     <template x-if="view === 'accounts'">
       <div><!-- @include accounts --></div>
@@ -10,6 +19,7 @@
   <!-- @include partials/lock -->
   <!-- @include partials/approval -->
   <!-- @include partials/security -->
+  <!-- @include partials/settings -->
   <!-- @include partials/confirm -->
   <!-- @include partials/toast -->
 </div>

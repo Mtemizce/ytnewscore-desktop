@@ -5,10 +5,7 @@
       <span>YTNews<b>Core</b> <small>Hesap Ekle</small></span>
     </div>
 
-    <label class="field">
-      <span>Site adresi</span>
-      <input class="input" x-model="form.baseUrl" placeholder="https://site.com" required>
-    </label>
+    <p class="hint">Sunucu: <b x-text="serverLabel"></b> <button type="button" class="link" @click="openSettings()">Ayarlar</button></p>
     <p class="hint hint-warn" x-show="insecureUrl">
       Bu adres HTTPS değil: şifre şifrelenmeden gider. Canlı sitede https:// kullanın.
     </p>
@@ -28,6 +25,7 @@
     <button class="btn btn-primary btn-block" :disabled="loggingIn">
       <span x-text="loggingIn ? 'Giriş yapılıyor…' : 'Giriş Yap'"></span>
     </button>
+    <button type="button" class="link" :disabled="loggingIn || twoFactor.telegram.waiting" @click="startForgotTelegram()">Şifremi unuttum: Telegram ile giriş yap</button>
     <button type="button" class="link" x-show="list.length" @click="showAccounts()">‹ Hesaplara dön</button>
     <p class="hint">Cihaz adı otomatik gönderilir; bağlantıyı panelde Ayarlar › API › Bağlı Hesaplar'dan kesebilirsiniz.</p>
   </form>

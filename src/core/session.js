@@ -2,7 +2,7 @@
 // Bir hesap: { id, baseUrl, token, user: {id, name, email, avatar_url}, siteName }.
 
 const KEYS = { accounts: 'accounts', active: 'active_account' };
-const DEFAULT_URL = 'http://ytnews.lv.local';
+import { appSettings } from './settings.js';
 
 function read() {
   try {
@@ -58,7 +58,7 @@ export const session = {
   override: null,
 
   get baseUrl() {
-    return this.override?.baseUrl ?? accounts.active()?.baseUrl ?? DEFAULT_URL;
+    return this.override?.baseUrl ?? accounts.active()?.baseUrl ?? appSettings.get().serverUrl;
   },
 
   get token() {
@@ -74,7 +74,6 @@ export const session = {
     }
   },
 
-  defaultUrl: DEFAULT_URL,
 };
 
 /**

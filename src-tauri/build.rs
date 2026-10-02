@@ -4,6 +4,7 @@ fn main() {
     tauri_build::try_build(tauri_build::Attributes::new().app_manifest(tauri_build::AppManifest::new().commands(&[
         "show_main",
         "open_panel",
+        "apply_window_settings",
         "close_panel",
         "set_locked",
         "set_shell_visible",
