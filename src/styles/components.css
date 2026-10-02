@@ -127,3 +127,10 @@
 .ban-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; margin: 12px 0; font-size: var(--fs-sm); }
 .ban-grid dt { color: var(--text-muted); font-size: var(--fs-xs); }
 .ban-grid dd { margin: 0; overflow: hidden; text-overflow: ellipsis; color: var(--text); font-weight: 500; }
+
+/* Giriş onay sorusu (Telegram'a giden aynı soru): kilit açıkken tam ekran kart. */
+.approval { position: fixed; inset: 0; z-index: 900; display: grid; place-items: center; background: rgba(15, 13, 26, 0.6); padding: 16px; }
+.approval-card { width: min(420px, 100%); background: var(--surface, #fff); color: var(--text, #111); border-radius: 14px; padding: 20px; box-shadow: 0 20px 50px rgba(0, 0, 0, 0.3); }
+.approval-title { font-weight: 700; font-size: 1.05rem; margin-bottom: 8px; }
+.approval-text { white-space: pre-wrap; font: inherit; font-size: 0.875rem; line-height: 1.45; margin: 0 0 16px; }
+.approval-actions { display: flex; flex-wrap: wrap; gap: 8px; }

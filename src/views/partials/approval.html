@@ -1,0 +1,11 @@
+<div class="approval" x-show="approval && !locked" style="display: none;" x-transition.opacity role="dialog" aria-modal="true">
+  <div class="approval-card">
+    <div class="approval-title" x-text="approval?.purpose === 'web_login' ? 'Giriş isteği' : 'Onay isteği'"></div>
+    <pre class="approval-text" x-text="approval?.text"></pre>
+    <div class="approval-actions">
+      <button type="button" class="btn btn-primary" @click="answerApproval('approve')" :disabled="answering">Onayla</button>
+      <button type="button" class="btn" @click="answerApproval('reject')" :disabled="answering">Reddet</button>
+      <button type="button" class="btn btn-danger" x-show="approval?.offers_block" @click="answerApproval('block')" :disabled="answering">IP'yi Engelle</button>
+    </div>
+  </div>
+</div>

@@ -8,6 +8,9 @@ export const api = {
   auth: {
     login: (login, password, deviceName) => request('POST', '/auth/login', { login, password, device_name: deviceName }),
     twoFactor: (challenge, code) => request('POST', '/auth/two-factor', { challenge, code }),
+    /** Girişte Telegram onayı: iste, sonra aynı challenge ile durumu yokla (onaylanınca token gelir). */
+    telegram: (challenge) => request('POST', '/auth/telegram', { challenge }),
+    telegramStatus: (challenge) => request('POST', '/auth/telegram/status', { challenge }),
     logout: () => request('POST', '/auth/logout'),
     /** Panel penceresi için tek kullanımlık, 60 saniyelik giriş bağlantısı. */
     webSession: (path = '/admin') => request('POST', '/auth/web-session', { path }),
@@ -16,10 +19,19 @@ export const api = {
   me: {
     show: () => request('GET', '/me'),
     verifyPassword: (password) => request('POST', '/me/verify-password', { password }),
+    /** Kilit ekranında parola yerine Telegram onayı. */
+    unlockTelegram: (deviceName) => request('POST', '/me/unlock/telegram', { device_name: deviceName }),
+    unlockTelegramStatus: (approvalId, secret) => request('POST', '/me/unlock/telegram/status', { approval_id: approvalId, secret }),
   },
 
   notifications: {
     list: () => request('GET', '/notifications'),
+  },
+
+  /** Hesabın açık giriş/onay soruları (Telegram'a giden aynı soru): masaüstünden de cevaplanır. */
+  approvals: {
+    list: () => request('GET', '/login-approvals'),
+    answer: (id, decision) => request('POST', `/login-approvals/${id}/${decision}`),
   },
 
   /** Pano: sayılar, anlık ziyaretçi, servis durumu (widget, kilit ekranı, tepsi). */

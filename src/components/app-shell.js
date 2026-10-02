@@ -1,8 +1,9 @@
-// Kabuk: hesap seçici (çok site/hesap, 2FA ile ekleme), panel penceresini açma, kilit ekranı,
+// Kabuk: hesap seçici (çok site/hesap, 2FA ya da Telegram onayıyla ekleme), panel penceresini açma,
+// yalnız kullanıcı kilitleyince çıkan kilit ekranı (parola ya da Telegram onayı), giriş onay soruları,
 // arka planda sistem bildirimleri (Reverb + yoklama) ve tepsi ipucu. Panelin ekranları panelden gelir.
 import { api } from '../api/index.js';
 import { deviceName } from '../core/device.js';
-import { closePanel, onShellEvent, openPanel, setLocked, setShellVisible, systemIdleSeconds, toggleWindowFullscreen } from '../core/desktop.js';
+import { closePanel, onShellEvent, openPanel, setLocked, setShellVisible, toggleWindowFullscreen } from '../core/desktop.js';
 import { errorMessage, formatDate, initials } from '../core/format.js';
 import { isTauri, whenUnauthorized } from '../core/http.js';
 import { systemNotify } from '../core/notify.js';
@@ -12,7 +13,12 @@ import { accounts, isInsecureRemote, session } from '../core/session.js';
 const POLL_MS = 60_000;
 const LAST_SEEN_KEY = 'last_notification_id';
 const LOCKED_KEY = 'app_locked';
-const IDLE_LOCK_SECONDS = 15 * 60;
+const APPROVAL_POLL_MS = 20_000;
+const TELEGRAM_WAIT_MS = 200_000;
+
+function emptyTwoFactor() {
+  return { challenge: null, code: '', methods: [], telegram: { waiting: false, message: '' } };
+}
 
 export function appShell() {
   return {
@@ -22,7 +28,8 @@ export function appShell() {
     opening: null,
 
     form: { baseUrl: accounts.active()?.baseUrl ?? session.defaultUrl, login: '', password: '' },
-    twoFactor: { challenge: null, code: '' },
+    twoFactor: emptyTwoFactor(),
+    telegramTimer: null,
     loginError: '',
     loggingIn: false,
 
@@ -30,9 +37,17 @@ export function appShell() {
     unlockPassword: '',
     unlockError: '',
     unlocking: false,
+    unlockTelegram: { waiting: false, message: '' },
+    unlockTimer: null,
+
+    // Hesabın giriş/onay soruları (Telegram'a giden aynı soru); kendi kilit isteğimiz gösterilmez.
+    approval: null,
+    answering: false,
+    approvalTimer: null,
+    ownApprovals: new Set(),
+    notifiedApprovals: new Set(),
 
     pollTimer: null,
-    idleTimer: null,
     panelOpen: false,
     readyTimer: null,
     signingOut: false,
@@ -54,15 +69,14 @@ export function appShell() {
         }
       });
 
-      clearInterval(this.idleTimer);
-      this.idleTimer = setInterval(() => this.checkIdle(), 30_000);
-
-      // Uygulama açılırken hatırlanan hesap kendiliğinden açılmaz: kilit ekranı o hesabın şifresini
-      // ister (aynı bilgisayarı kullanan biri başkasının paneline giremesin).
+      // Kilit yalnız kullanıcı "Kilitle" deyince vardır; uygulama kapanıp bilgisayar yeniden başlasa
+      // bile hatırlanan hesap şifresiz açılır (kilitliyse kilit ekranı gelir ve kilitli kalır).
       const active = accounts.active();
       if (active?.token) {
-        this.setLockedState(true);
         this.startBackground();
+        if (!this.locked) {
+          this.open(active);
+        }
       }
       if (!this.list.length) {
         this.view = 'add';
@@ -207,6 +221,8 @@ export function appShell() {
 
     async stopActive() {
       clearInterval(this.pollTimer);
+      clearInterval(this.approvalTimer);
+      this.approval = null;
       disconnectRealtime();
       this.$store.stats.stop();
       this.setLockedState(false);
@@ -218,7 +234,8 @@ export function appShell() {
 
     startAdd(account = null) {
       this.form = { baseUrl: account?.baseUrl ?? this.active?.baseUrl ?? session.defaultUrl, login: account?.user?.email ?? '', password: '' };
-      this.twoFactor = { challenge: null, code: '' };
+      clearInterval(this.telegramTimer);
+      this.twoFactor = emptyTwoFactor();
       this.loginError = '';
       this.view = 'add';
       setShellVisible(true);
@@ -228,7 +245,12 @@ export function appShell() {
       await this.attempt(async () => {
         const response = await session.withLogin(this.form.baseUrl, async () => api.auth.login(this.form.login.trim(), this.form.password, await deviceName()));
         if (response.two_factor_required) {
-          this.twoFactor = { challenge: response.challenge, code: '' };
+          const methods = response.methods ?? ['totp'];
+          this.twoFactor = { ...emptyTwoFactor(), challenge: response.challenge, methods };
+          // Yalnız Telegram açıksa istek kendiliğinden gider.
+          if (!methods.includes('totp') && methods.includes('telegram')) {
+            this.startTelegramLogin();
+          }
 
           return;
         }
@@ -242,14 +264,59 @@ export function appShell() {
         await this.finishLogin(response);
       }, (error) => {
         if (error.errors?.challenge) {
-          this.twoFactor = { challenge: null, code: '' };
+          this.twoFactor = emptyTwoFactor();
         }
       });
     },
 
     cancelTwoFactor() {
-      this.twoFactor = { challenge: null, code: '' };
+      clearInterval(this.telegramTimer);
+      this.twoFactor = emptyTwoFactor();
       this.loginError = '';
+    },
+
+    /** Girişte "Telegram ile onayla": Telegram'a (ve açık başka bir uygulamaya) sorar, onayı yoklar. */
+    async startTelegramLogin() {
+      clearInterval(this.telegramTimer);
+      this.loginError = '';
+      this.twoFactor.telegram = { waiting: true, message: "Telegram'a istek gönderiliyor…" };
+      try {
+        await session.withLogin(this.form.baseUrl, () => api.auth.telegram(this.twoFactor.challenge));
+        this.twoFactor.telegram.message = "Telegram'da (ya da açık başka bir uygulamada) gelen isteği onaylayın; 3 dakika içinde.";
+        const stopAt = Date.now() + TELEGRAM_WAIT_MS;
+        this.telegramTimer = setInterval(() => this.pollTelegramLogin(stopAt), 2000);
+      } catch (error) {
+        this.twoFactor.telegram = { waiting: false, message: '' };
+        this.loginError = Object.values(error.errors || {}).flat()[0] || errorMessage(error);
+      }
+    },
+
+    async pollTelegramLogin(stopAt) {
+      const stop = (message) => {
+        clearInterval(this.telegramTimer);
+        this.twoFactor.telegram = { waiting: false, message: '' };
+        this.loginError = message;
+      };
+      if (Date.now() > stopAt) {
+        stop('Süre doldu. Yeniden deneyebilirsiniz.');
+
+        return;
+      }
+      try {
+        const result = await session.withLogin(this.form.baseUrl, () => api.auth.telegramStatus(this.twoFactor.challenge));
+        if (result.status === 'pending') {
+          return;
+        }
+        clearInterval(this.telegramTimer);
+        if (result.status === 'approved') {
+          await this.finishLogin(result);
+
+          return;
+        }
+        stop({ rejected: 'İstek Telegram’da reddedildi.', blocked: 'Bu giriş denemesi engellendi.' }[result.status] || 'İstek sona erdi. Yeniden deneyebilirsiniz.');
+      } catch {
+        // Ağ dalgalanması: sonraki tur dener.
+      }
     },
 
     async attempt(action, onError = () => {}) {
@@ -270,7 +337,8 @@ export function appShell() {
       const info = await session.withLogin(baseUrl, () => api.info()).catch(() => null);
       const id = accounts.upsert({ baseUrl, token: response.token, user: response.user, siteName: info?.name || new URL(baseUrl).host });
       this.form.password = '';
-      this.twoFactor = { challenge: null, code: '' };
+      clearInterval(this.telegramTimer);
+      this.twoFactor = emptyTwoFactor();
       await this.stopActive();
       this.refreshList();
       await this.open(this.list.find((a) => a.id === id));
@@ -290,6 +358,8 @@ export function appShell() {
       this.locked = value;
       this.unlockPassword = '';
       this.unlockError = '';
+      clearInterval(this.unlockTimer);
+      this.unlockTelegram = { waiting: false, message: '' };
       localStorage.setItem(LOCKED_KEY, value ? '1' : '0');
       setLocked(value);
     },
@@ -311,10 +381,62 @@ export function appShell() {
       }
     },
 
-    async checkIdle() {
-      if (!this.locked && this.active?.token && (await systemIdleSeconds()) >= IDLE_LOCK_SECONDS) {
-        this.lock();
+    /** Kilit ekranında "Şifremi unuttum": bağlı Telegram'a onay sorusu gider. */
+    get canTelegramUnlock() {
+      return Boolean(this.user?.telegram_id);
+    },
+
+    async unlockViaTelegram() {
+      clearInterval(this.unlockTimer);
+      this.unlockError = '';
+      this.unlockTelegram = { waiting: true, message: "Telegram'a istek gönderiliyor…" };
+      try {
+        const started = await api.me.unlockTelegram(await deviceName());
+        this.ownApprovals.add(started.approval_id);
+        this.unlockTelegram.message = "Telegram'daki isteği onaylayın; 3 dakika içinde.";
+        const stopAt = Date.now() + TELEGRAM_WAIT_MS;
+        this.unlockTimer = setInterval(() => this.pollTelegramUnlock(started, stopAt), 2000);
+      } catch (error) {
+        this.unlockTelegram = { waiting: false, message: '' };
+        this.unlockError = Object.values(error.errors || {}).flat()[0] || errorMessage(error);
       }
+    },
+
+    async pollTelegramUnlock(started, stopAt) {
+      const stop = (message) => {
+        clearInterval(this.unlockTimer);
+        this.unlockTelegram = { waiting: false, message: '' };
+        this.unlockError = message;
+      };
+      if (Date.now() > stopAt) {
+        stop('Süre doldu. Yeniden deneyebilirsiniz.');
+
+        return;
+      }
+      try {
+        const result = await api.me.unlockTelegramStatus(started.approval_id, started.secret);
+        if (result.status === 'pending') {
+          return;
+        }
+        if (result.status === 'approved') {
+          clearInterval(this.unlockTimer);
+          this.setLockedState(false);
+          if (!this.panelOpen && this.active) {
+            await this.open(this.active);
+          }
+          this.pollApprovals();
+
+          return;
+        }
+        stop(result.status === 'rejected' ? 'İstek Telegram’da reddedildi.' : 'İstek sona erdi. Yeniden deneyebilirsiniz.');
+      } catch {
+        // Ağ dalgalanması: sonraki tur dener.
+      }
+    },
+
+    cancelUnlockTelegram() {
+      clearInterval(this.unlockTimer);
+      this.unlockTelegram = { waiting: false, message: '' };
     },
 
     // --- Arka plan: bildirimler, Pano ---------------------------------------------------
@@ -324,6 +446,9 @@ export function appShell() {
       this.pollNotifications(true);
       clearInterval(this.pollTimer);
       this.pollTimer = setInterval(() => this.pollNotifications(), POLL_MS);
+      this.pollApprovals();
+      clearInterval(this.approvalTimer);
+      this.approvalTimer = setInterval(() => this.pollApprovals(), APPROVAL_POLL_MS);
       this.startRealtime();
     },
 
@@ -335,9 +460,54 @@ export function appShell() {
         }
         const { echo, channels } = connection;
         echo.private(channels.notifications).listen('.InAppNotificationCreated', (event) => this.onLiveNotification(event));
+        echo.private(channels.notifications).listen('.LoginApprovalRequested', () => this.pollApprovals());
         echo.private(channels.dashboard).listen('.DashboardUpdated', () => this.$store.stats.refresh());
       } catch {
         // Reverb yoksa yoklama yeterli.
+      }
+    },
+
+    /** Açık giriş/onay soruları: yeni olan sistem bildirimi olur; kilit açıkken soru penceresi çıkar. */
+    async pollApprovals() {
+      if (!this.active?.token) {
+        return;
+      }
+      try {
+        const response = await api.approvals.list();
+        const now = Date.now();
+        const items = (response.data ?? []).filter((a) => !this.ownApprovals.has(a.id) && new Date(a.expires_at).getTime() > now);
+        items.filter((a) => !this.notifiedApprovals.has(a.id)).forEach((a) => {
+          this.notifiedApprovals.add(a.id);
+          systemNotify(this.active?.siteName || 'YTNewsCore', `Giriş onayı bekliyor — IP ${a.ip}`);
+        });
+        const next = this.locked ? null : (items[0] ?? null);
+        if (next && !this.approval && this.panelOpen) {
+          setShellVisible(true);
+        }
+        this.approval = next;
+      } catch {
+        // Bir sonraki turu bekler.
+      }
+    },
+
+    async answerApproval(decision) {
+      const current = this.approval;
+      if (!current || this.answering) {
+        return;
+      }
+      this.answering = true;
+      try {
+        const result = await api.approvals.answer(current.id, decision);
+        this.$store.ui.notify('success', result.message);
+      } catch (error) {
+        this.$store.ui.notify('error', errorMessage(error));
+      } finally {
+        this.answering = false;
+        this.approval = null;
+        if (this.panelOpen && !this.locked) {
+          setShellVisible(false);
+        }
+        this.pollApprovals();
       }
     },
 

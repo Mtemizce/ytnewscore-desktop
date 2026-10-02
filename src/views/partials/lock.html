@@ -6,6 +6,9 @@
     <input class="input lock-input" type="password" data-unlock-input x-model="unlockPassword" placeholder="Parola" autocomplete="current-password" required>
     <p class="lock-error" x-show="unlockError" x-text="unlockError"></p>
     <button class="btn btn-primary btn-block" :disabled="unlocking" x-text="unlocking ? 'Açılıyor…' : 'Kilidi Aç'"></button>
+    <button type="button" class="link lock-link" x-show="canTelegramUnlock && !unlockTelegram.waiting" @click="unlockViaTelegram()">Şifremi unuttum: Telegram'dan onayla</button>
+    <p class="lock-hint" x-show="unlockTelegram.waiting" x-text="unlockTelegram.message"></p>
+    <button type="button" class="link lock-link" x-show="unlockTelegram.waiting" @click="cancelUnlockTelegram()">Vazgeç</button>
     <button type="button" class="link lock-link" @click="signOutActive()">Bu hesaptan çık</button>
     <p class="lock-hint">F11 · tam ekran</p>
   </form>
