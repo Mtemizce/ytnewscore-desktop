@@ -1,6 +1,6 @@
 // Uygulama ayarları penceresi: sunucu adresi (bir kez tanımlanır, sonra değiştirilebilir), panel
 // penceresinin varsayılan boyutu ve çerçevesiz kullanım. Girişten bağımsızdır.
-import { applyWindowSettings } from '../core/desktop.js';
+import { applyWindowSettings, getAutostart, setAutostart } from '../core/desktop.js';
 import { isInsecureRemote } from '../core/session.js';
 import { appSettings, MIN_HEIGHT, MIN_WIDTH, normalizeServerUrl } from '../core/settings.js';
 
@@ -14,11 +14,17 @@ export function settingsPanel() {
   const saved = appSettings.get();
 
   return {
-    form: { serverUrl: saved.serverUrl, width: saved.width, height: saved.height, frameless: saved.frameless },
+    form: { serverUrl: saved.serverUrl, width: saved.width, height: saved.height, frameless: saved.frameless, closeToTray: saved.closeToTray, siteBranding: saved.siteBranding, autostart: false },
     error: '',
     presets: PRESETS,
     minWidth: MIN_WIDTH,
     minHeight: MIN_HEIGHT,
+
+    init() {
+      getAutostart().then((enabled) => {
+        this.form.autostart = enabled;
+      });
+    },
 
     get firstRun() {
       return !appSettings.get().serverUrl;
@@ -37,7 +43,7 @@ export function settingsPanel() {
       this.form.height = preset.height;
     },
 
-    save() {
+    async save() {
       this.error = '';
       const serverUrl = normalizeServerUrl(this.form.serverUrl);
       if (!serverUrl) {
@@ -52,7 +58,19 @@ export function settingsPanel() {
 
         return;
       }
-      const next = appSettings.update({ serverUrl, width, height, frameless: Boolean(this.form.frameless) });
+      const next = appSettings.update({
+        serverUrl,
+        width,
+        height,
+        frameless: Boolean(this.form.frameless),
+        closeToTray: Boolean(this.form.closeToTray),
+        siteBranding: Boolean(this.form.siteBranding),
+      });
+      try {
+        await setAutostart(Boolean(this.form.autostart));
+      } catch (error) {
+        this.$store.ui.notify('error', `Otomatik başlatma ayarlanamadı: ${error?.message || error}`);
+      }
       applyWindowSettings(next);
       window.dispatchEvent(new CustomEvent('settings-updated'));
       this.$store.ui.notify('success', 'Ayarlar kaydedildi.');

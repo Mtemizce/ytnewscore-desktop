@@ -13,6 +13,9 @@ fn main() {
         "toggle_window_fullscreen",
         "set_tray_tooltip",
         "quit_app",
+        "get_autostart",
+        "set_autostart",
+        "set_branding",
         "panel_action",
     ])))
     .expect("tauri build betiği çalışmadı");

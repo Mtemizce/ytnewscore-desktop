@@ -36,6 +36,15 @@
           <p class="hint">Açıkken pencereler çerçevesizdir: üstteki çubuktan (panelde ortadaki tutamaçtan) sürüklenir, sağ üstteki düğmelerle küçültülür, büyütülür, kapatılır. Kapalıyken normal pencere çerçevesi kullanılır.</p>
         </section>
 
+        <section class="sec-block">
+          <div class="sec-title"><b>Başlangıç ve sistem tepsisi</b></div>
+          <label class="check"><input type="checkbox" x-model="form.autostart"> Bilgisayar açılınca otomatik başlat (tepsiye gizli)</label>
+          <label class="check"><input type="checkbox" x-model="form.closeToTray"> Pencereyi kapatınca sistem tepsisine küçült</label>
+          <p class="hint">Tepsiye küçültme kapalıyken pencereyi kapatmak uygulamadan çıkar. Tepsi simgesinden uygulama yeniden açılır.</p>
+          <label class="check"><input type="checkbox" x-model="form.siteBranding"> Uygulama adı ve ikonu sitenin adı/favicon'u olsun</label>
+          <p class="hint">Sunucudaki sitenin favicon'u pencere ve tepsi ikonu olarak kullanılır; bulunamazsa varsayılan ikon kalır. Değişiklik sonraki hesap açılışında uygulanır.</p>
+        </section>
+
         <p class="alert alert-error" x-show="error" x-text="error"></p>
         <div class="sec-actions"><button class="btn btn-primary btn-sm">Kaydet</button></div>
       </form>

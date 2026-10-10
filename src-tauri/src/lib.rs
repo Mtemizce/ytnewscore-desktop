@@ -10,6 +10,7 @@ use tauri::{
     webview::NewWindowResponse,
     AppHandle, Emitter, Manager, State, Url, WebviewUrl, WebviewWindow, WebviewWindowBuilder, WindowEvent,
 };
+use tauri_plugin_autostart::ManagerExt as AutostartExt;
 use tauri_plugin_opener::OpenerExt;
 
 const TRAY_ID: &str = "main";
@@ -24,6 +25,12 @@ const PANEL_SCRIPT: &str = include_str!("panel-drawer.js");
 #[derive(Default)]
 struct AppState {
     locked: Mutex<bool>,
+    /// Ayarlar: pencere kapatılınca uygulama sistem tepsisine gizlenir (varsayılan) ya da kapanır.
+    /// `Default` false verdiği için `run()` içinde true ile başlatılır.
+    close_to_tray: Mutex<bool>,
+    /// Bilgisayar açılışında otomatik başlatıldı (`--autostart`): pencereler tepsiye gizli açılır,
+    /// kullanıcı tepsiden açana kadar panel de kendini göstermez.
+    start_hidden: Mutex<bool>,
     /// Panelden "Oturumu kapat"tan sonra gelen /admin/login yönlendirmesi "oturum düştü" sayılmaz
     /// (yoksa kabuk token ile yeniden giriş yapardı).
     logging_out: Mutex<bool>,
@@ -62,6 +69,7 @@ fn show_window(app: &AppHandle, label: &str) {
 
 /// Tepsi / widget "Aç": kilitliyse kilit ekranı, panel açıksa panel, değilse hesap seçici.
 fn open_app(app: &AppHandle) {
+    *app.state::<AppState>().start_hidden.lock().unwrap() = false;
     let locked = *app.state::<AppState>().locked.lock().unwrap();
     if !locked && app.get_webview_window(PANEL_LABEL).is_some() {
         show_window(app, PANEL_LABEL);
@@ -116,7 +124,10 @@ async fn open_panel(app: AppHandle, url: String, title: String, width: Option<f6
             if !matches!(payload.event(), tauri::webview::PageLoadEvent::Finished) {
                 return;
             }
-            if !window.is_visible().unwrap_or(true) && !*ready.state::<AppState>().locked.lock().unwrap() {
+            if !window.is_visible().unwrap_or(true)
+                && !*ready.state::<AppState>().locked.lock().unwrap()
+                && !*ready.state::<AppState>().start_hidden.lock().unwrap()
+            {
                 let _ = window.show();
                 let _ = window.set_focus();
             }
@@ -196,7 +207,10 @@ fn apply_panel_frame(window: &WebviewWindow, frameless: bool) {
 /// Ayarlar kaydedilince: kabuk ve (açıksa) panel penceresi çerçeve kipini, panel penceresi
 /// ayrıca varsayılan boyutu hemen alır. Kapalı pencereler bir sonraki açılışta ayarı okur.
 #[tauri::command]
-async fn apply_window_settings(app: AppHandle, width: Option<f64>, height: Option<f64>, frameless: bool) -> Result<(), String> {
+async fn apply_window_settings(app: AppHandle, width: Option<f64>, height: Option<f64>, frameless: bool, close_to_tray: Option<bool>) -> Result<(), String> {
+    if let Some(value) = close_to_tray {
+        *app.state::<AppState>().close_to_tray.lock().unwrap() = value;
+    }
     if let Some(shell) = app.get_webview_window(SHELL_LABEL) {
         let _ = shell.set_decorations(!frameless);
     }
@@ -366,6 +380,56 @@ fn set_tray_tooltip(app: AppHandle, text: String) {
     }
 }
 
+/// Windows başlangıcında (açılışta) otomatik başlatma açık mı.
+#[tauri::command]
+async fn get_autostart(app: AppHandle) -> Result<bool, String> {
+    app.autolaunch().is_enabled().map_err(|e| e.to_string())
+}
+
+/// Ayarlar › "Bilgisayar açılınca otomatik başlat".
+#[tauri::command]
+async fn set_autostart(app: AppHandle, enabled: bool) -> Result<(), String> {
+    let manager = app.autolaunch();
+    if enabled {
+        manager.enable().map_err(|e| e.to_string())
+    } else {
+        manager.disable().map_err(|e| e.to_string())
+    }
+}
+
+/// Uygulama adı ve ikonu sunucudaki sitenin adı / favicon'u olur: pencere başlığı, pencere ve
+/// tepsi ikonu. `icon` PNG ya da ICO baytlarıdır; boş/çözülemezse yalnız ad uygulanır.
+#[tauri::command]
+async fn set_branding(app: AppHandle, name: String, icon: Option<Vec<u8>>) -> Result<(), String> {
+    let image = icon
+        .filter(|bytes| !bytes.is_empty())
+        .and_then(|bytes| tauri::image::Image::from_bytes(&bytes).ok());
+
+    if let Some(shell) = app.get_webview_window(SHELL_LABEL) {
+        if !name.is_empty() {
+            let _ = shell.set_title(&name);
+        }
+        if let Some(image) = &image {
+            let _ = shell.set_icon(image.clone());
+        }
+    }
+    if let Some(panel) = app.get_webview_window(PANEL_LABEL) {
+        if let Some(image) = &image {
+            let _ = panel.set_icon(image.clone());
+        }
+    }
+    if let Some(tray) = app.tray_by_id(TRAY_ID) {
+        if let Some(image) = image {
+            let _ = tray.set_icon(Some(image));
+        }
+        if !name.is_empty() {
+            let _ = tray.set_tooltip(Some(name));
+        }
+    }
+
+    Ok(())
+}
+
 #[tauri::command]
 fn quit_app(app: AppHandle) {
     app.exit(0);
@@ -422,8 +486,10 @@ fn build_tray(app: &AppHandle) -> tauri::Result<()> {
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
+    let started_by_autostart = std::env::args().any(|argument| argument == "--autostart");
+
     tauri::Builder::default()
-        .manage(AppState::default())
+        .manage(AppState { close_to_tray: Mutex::new(true), start_hidden: Mutex::new(started_by_autostart), ..AppState::default() })
         .manage(downloads::DownloadState::default())
         // Kabuğun API istekleri Rust tarafından atılır (CORS yok); izinli adresler capabilities/default.json.
         .plugin(tauri_plugin_http::init())
@@ -433,6 +499,8 @@ pub fn run() {
         .plugin(tauri_plugin_os::init())
         // Panelden çıkan bağlantılar varsayılan tarayıcıda.
         .plugin(tauri_plugin_opener::init())
+        // Bilgisayar açılışında otomatik başlat (Windows kayıt defteri Run anahtarı).
+        .plugin(tauri_plugin_autostart::init(tauri_plugin_autostart::MacosLauncher::LaunchAgent, Some(vec!["--autostart"])))
         .invoke_handler(tauri::generate_handler![
             show_main,
             open_panel,
@@ -445,10 +513,19 @@ pub fn run() {
             toggle_window_fullscreen,
             panel_action,
             set_tray_tooltip,
-            quit_app
+            quit_app,
+            get_autostart,
+            set_autostart,
+            set_branding
         ])
         .setup(|app| {
             build_tray(app.handle())?;
+            // Otomatik başlatmada kabuk penceresi tepsiye gizli açılır.
+            if *app.state::<AppState>().start_hidden.lock().unwrap() {
+                if let Some(shell) = app.get_webview_window(SHELL_LABEL) {
+                    let _ = shell.hide();
+                }
+            }
             // Yalnız geliştirme derlemesi: panel penceresini verilen adreste açar (bağlantı,
             // indirme davranışını gerçek pencerede denemek için; giriş gerektirmez).
             #[cfg(debug_assertions)]
@@ -462,12 +539,17 @@ pub fn run() {
             }
             Ok(())
         })
-        // Pencereleri kapatmak uygulamayı tepsiye gizler; çıkış tepsi menüsünden.
+        // Ayarlar › "Sistem tepsisine küçült" açıkken (varsayılan) pencereyi kapatmak uygulamayı
+        // tepsiye gizler (çıkış tepsi menüsünden); kapalıyken uygulama kapanır.
         .on_window_event(|window, event| {
             if matches!(window.label(), SHELL_LABEL | PANEL_LABEL) {
                 if let WindowEvent::CloseRequested { api, .. } = event {
-                    api.prevent_close();
-                    let _ = window.hide();
+                    if *window.app_handle().state::<AppState>().close_to_tray.lock().unwrap() {
+                        api.prevent_close();
+                        let _ = window.hide();
+                    } else {
+                        window.app_handle().exit(0);
+                    }
                 }
             }
         })

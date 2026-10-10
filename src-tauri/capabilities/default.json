@@ -23,6 +23,9 @@
     "allow-toggle-window-fullscreen",
     "allow-set-tray-tooltip",
     "allow-quit-app",
+    "allow-get-autostart",
+    "allow-set-autostart",
+    "allow-set-branding",
     "notification:default",
     "os:default",
     {

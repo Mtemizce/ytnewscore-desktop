@@ -1,0 +1,11 @@
+# Automatically generated - DO NOT EDIT!
+
+[[permission]]
+identifier = "allow-set-branding"
+description = "Enables the set_branding command without any pre-configured scope."
+commands.allow = ["set_branding"]
+
+[[permission]]
+identifier = "deny-set-branding"
+description = "Denies the set_branding command without any pre-configured scope."
+commands.deny = ["set_branding"]

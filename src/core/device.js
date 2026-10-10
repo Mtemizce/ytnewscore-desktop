@@ -4,9 +4,12 @@ import { isTauri } from './http.js';
 
 const PLATFORM_NAMES = { windows: 'Windows', macos: 'macOS', linux: 'Linux', ios: 'iOS', android: 'Android' };
 
-export async function deviceName() {
+export async function deviceName(location = '') {
+  const label = String(location || '').trim();
+  const withLabel = (name) => (label ? `${name} · ${label}` : name);
+
   if (!isTauri) {
-    return 'YTCoreNews Masaüstü (tarayıcı)';
+    return withLabel('YTCoreNews Masaüstü (tarayıcı)');
   }
 
   try {
@@ -14,8 +17,8 @@ export async function deviceName() {
     const major = String(version() || '').split('.')[0];
     const host = await hostname();
 
-    return [`${name}${major ? ` ${major}` : ''}`, host].filter(Boolean).join(' · ');
+    return withLabel([`${name}${major ? ` ${major}` : ''}`, host].filter(Boolean).join(' · '));
   } catch {
-    return 'YTCoreNews Masaüstü';
+    return withLabel('YTCoreNews Masaüstü');
   }
 }

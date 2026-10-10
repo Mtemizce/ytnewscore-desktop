@@ -1,6 +1,7 @@
 // Rust kabuğuyla köprü: panel penceresi, kilit, kabuk görünürlüğü, hareketsizlik, tepsi, widget.
 import { invoke } from '@tauri-apps/api/core';
 import { listen } from '@tauri-apps/api/event';
+import { fetch as tauriFetch } from '@tauri-apps/plugin-http';
 import { isTauri } from './http.js';
 import { appSettings } from './settings.js';
 
@@ -23,7 +24,36 @@ export function openPanel(url, title) {
 }
 
 /** Ayarlar kaydedilince: açık pencerelerin çerçeve kipi ve panel boyutu hemen uygulanır. */
-export const applyWindowSettings = ({ width, height, frameless }) => call('apply_window_settings', { width, height, frameless });
+export const applyWindowSettings = ({ width, height, frameless, closeToTray }) => call('apply_window_settings', { width, height, frameless, closeToTray });
+
+/** Bilgisayar açılışında otomatik başlatma (işletim sisteminin kaydı; ayar dosyasında tutulmaz). */
+export const getAutostart = () => call('get_autostart').then((value) => Boolean(value)).catch(() => false);
+export const setAutostart = (enabled) => call('set_autostart', { enabled });
+
+/**
+ * Uygulama adı ve ikonu sitenin adı / favicon'u olur. Sunucu `favicon_url` (yoksa `logo_url`)
+ * bildirmezse sitenin /favicon.ico'su denenir; indirilemezse yalnız ad uygulanır.
+ */
+export async function applySiteBranding(baseUrl, info) {
+  if (!isTauri || !appSettings.get().siteBranding) {
+    return;
+  }
+  let icon = null;
+  try {
+    const candidates = [info?.favicon_url, info?.logo_url, `${baseUrl}/favicon.ico`].filter(Boolean);
+    for (const url of candidates) {
+      const response = await tauriFetch(url);
+      if (response.ok) {
+        icon = Array.from(new Uint8Array(await response.arrayBuffer()));
+        break;
+      }
+    }
+  } catch {
+    icon = null;
+  }
+
+  return call('set_branding', { name: info?.name || '', icon });
+}
 
 /** Çerçevesiz kabuk penceresinin düğmeleri (başlık çubuğu yok). */
 export async function windowControl(action) {

@@ -3,7 +3,7 @@
 // arka planda sistem bildirimleri (Reverb + yoklama) ve tepsi ipucu. Panelin ekranları panelden gelir.
 import { api } from '../api/index.js';
 import { deviceName } from '../core/device.js';
-import { applyWindowSettings, closePanel, onShellEvent, openPanel, setLocked, setShellVisible, toggleWindowFullscreen, windowControl } from '../core/desktop.js';
+import { applySiteBranding, applyWindowSettings, closePanel, onShellEvent, openPanel, setLocked, setShellVisible, toggleWindowFullscreen, windowControl } from '../core/desktop.js';
 import { errorMessage, formatDate, initials } from '../core/format.js';
 import { isTauri, whenUnauthorized } from '../core/http.js';
 import { systemNotify } from '../core/notify.js';
@@ -38,7 +38,7 @@ export function appShell() {
     // Sunucu adresi girişte sorulmaz: Ayarlar'da bir kez tanımlanır (hesapların kendi sunucusu kalır).
     settings: appSettings.get(),
     settingsOpen: false,
-    form: { baseUrl: appSettings.get().serverUrl || accounts.active()?.baseUrl || '', login: '', password: '' },
+    form: { baseUrl: appSettings.get().serverUrl || accounts.active()?.baseUrl || '', login: '', password: '', location: '' },
     twoFactor: emptyTwoFactor(),
     reset: emptyReset(),
     resetTimer: null,
@@ -177,6 +177,7 @@ export function appShell() {
         const [me, info, link] = await Promise.all([api.me.show(), api.info().catch(() => null), api.auth.webSession('/admin')]);
         accounts.update(account.id, { user: me.data, siteName: info?.name || account.siteName, lastOpenedAt: new Date().toISOString() });
         this.refreshList();
+        applySiteBranding(account.baseUrl, info).catch(() => {});
         await openPanel(link.url, `${this.active.siteName || 'Panel'} — YTNewsCore`);
         this.panelOpen = true;
         this.startBackground();
@@ -298,7 +299,7 @@ export function appShell() {
     // --- Hesap ekleme -------------------------------------------------------------------
 
     startAdd(account = null) {
-      this.form = { baseUrl: account?.baseUrl ?? this.settings.serverUrl, login: account?.user?.email ?? '', password: '' };
+      this.form = { baseUrl: account?.baseUrl ?? this.settings.serverUrl, login: account?.user?.email ?? '', password: '', location: this.form.location || '' };
       clearInterval(this.telegramTimer);
       this.twoFactor = emptyTwoFactor();
       this.loginError = '';
@@ -308,7 +309,7 @@ export function appShell() {
 
     async doLogin() {
       await this.attempt(async () => {
-        const response = await session.withLogin(this.form.baseUrl, async () => api.auth.login(this.form.login.trim(), this.form.password, await deviceName()));
+        const response = await session.withLogin(this.form.baseUrl, async () => api.auth.login(this.form.login.trim(), this.form.password, await deviceName(this.form.location)));
         if (response.two_factor_required) {
           const methods = response.methods ?? ['totp'];
           this.twoFactor = { ...emptyTwoFactor(), challenge: response.challenge, methods };

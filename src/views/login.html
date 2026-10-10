@@ -20,6 +20,15 @@
       <input class="input" type="password" x-model="form.password" autocomplete="current-password" required>
     </label>
 
+    <label class="field">
+      <span>Konum etiketi (isteğe bağlı)</span>
+      <select class="input" x-model="form.location">
+        <option value="">Belirtme</option>
+        <option value="Ev">Ev</option>
+        <option value="İş">İş</option>
+      </select>
+    </label>
+
     <p class="alert alert-error" x-show="loginError" x-text="loginError"></p>
 
     <button class="btn btn-primary btn-block" :disabled="loggingIn">

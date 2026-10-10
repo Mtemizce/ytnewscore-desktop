@@ -5,7 +5,8 @@ const KEY = 'app_settings';
 export const MIN_WIDTH = 960;
 export const MIN_HEIGHT = 600;
 
-const DEFAULTS = { serverUrl: '', width: 1360, height: 860, frameless: false };
+// closeToTray: pencereyi kapatınca sistem tepsisine gizle; siteBranding: ad/ikon sunucudaki sitenin favicon'u olsun.
+const DEFAULTS = { serverUrl: '', width: 1360, height: 860, frameless: false, closeToTray: true, siteBranding: true };
 
 function read() {
   try {
